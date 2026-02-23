@@ -60,6 +60,7 @@ class HierarchicalDataConfig:
 
     # Target
     forecast_horizon: int = 1
+    minute_forecast_horizon: int = 390  # bars ahead for minute target (~1 trading day)
 
     # Split ratios (by ticker count)
     train_frac: float = 0.80
@@ -624,34 +625,25 @@ def preprocess_minute_ticker(
     if cfg.minute_normalize:
         feat_arr = _normalize_array(feat_arr, cfg.minute_norm_window)
 
-    dates = mdf["date"].values
-    unique_dates = sorted(set(dates))
-    date_to_next = {unique_dates[j]: unique_dates[j + 1]
-                    for j in range(len(unique_dates) - 1)}
-
-    day_close = {}
-    for d in unique_dates:
-        if d in daily_close:
-            day_close[d] = daily_close[d]
-        else:
-            mask = dates == d
-            if mask.any():
-                day_close[d] = float(mdf.loc[mask, "close"].iloc[-1])
-
+    # Per-bar forward return targets: each bar predicts close[i+H]/close[i]-1
+    # This gives every bar a unique target (no duplication within a day).
+    close_vals = mdf["close"].values.astype(np.float64)
+    H = cfg.minute_forecast_horizon
     targets = np.full(len(mdf), np.nan, dtype=np.float32)
-    for i, d in enumerate(dates):
-        nd = date_to_next.get(d)
-        if nd is None:
-            continue
-        ct = day_close.get(d)
-        cn = day_close.get(nd)
-        if ct is not None and cn is not None and ct != 0:
-            targets[i] = float(cn / ct - 1.0)
+    valid_mask = (close_vals[:-H] > 0) if H < len(close_vals) else np.array([], dtype=bool)
+    if len(valid_mask) > 0:
+        fwd_ret = np.where(
+            valid_mask,
+            close_vals[H:] / np.clip(close_vals[:-H], 1e-8, None) - 1.0,
+            np.nan,
+        )
+        targets[:len(fwd_ret)] = fwd_ret.astype(np.float32)
 
     # Clip extreme targets to improve stability
     targets = np.clip(targets, -0.20, 0.20, out=targets)
 
     # Save ordinal dates for meta-model alignment and regime lookup
+    dates = mdf["date"].values
     ordinal_dates = np.array(
         [d.toordinal() if hasattr(d, 'toordinal') else 0 for d in dates],
         dtype=np.int32,

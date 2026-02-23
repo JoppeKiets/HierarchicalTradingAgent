@@ -7,7 +7,7 @@ Type=simple
 User=joppe-kietselaer
 WorkingDirectory=/home/joppe-kietselaer/Desktop/coding/tradingAgent
 Environment="PATH=/home/joppe-kietselaer/miniconda3/envs/trading311/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/home/joppe-kietselaer/miniconda3/envs/trading311/bin/python collect_minute_data.py --all-organized --continuous --interval 3600 --batch-size 200
+ExecStart=/home/joppe-kietselaer/miniconda3/envs/trading311/bin/python collect_minute_data.py --all-organized --continuous --interval 3600 --batch-size 500
 Restart=always
 RestartSec=60
 StandardOutput=append:/home/joppe-kietselaer/Desktop/coding/tradingAgent/logs/minute_collector.log
