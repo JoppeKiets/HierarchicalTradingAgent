@@ -116,10 +116,10 @@ def compute_returns_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def compute_volatility_features(df: pd.DataFrame, cfg: FeatureConfig) -> pd.DataFrame:
     """Volatility features: realized, Parkinson, range-based."""
-    close = df["close"].values
-    high = df["high"].values
-    low = df["low"].values
-    open_p = df["open"].values
+    close = np.maximum(df["close"].values, 1e-10)
+    high = np.maximum(df["high"].values, 1e-10)
+    low = np.maximum(df["low"].values, 1e-10)
+    open_p = np.maximum(df["open"].values, 1e-10)
     ret = pd.Series(close).pct_change(fill_method=None).values
     
     features = pd.DataFrame(index=df.index)
@@ -129,7 +129,7 @@ def compute_volatility_features(df: pd.DataFrame, cfg: FeatureConfig) -> pd.Data
         features[f"realized_vol_{w}d"] = _rolling_std(ret, w) * np.sqrt(252)
     
     # Parkinson volatility (uses high/low, more efficient estimator)
-    hl_ratio = np.log(high / np.maximum(low, 1e-10))
+    hl_ratio = np.log(high / low)
     parkinson = hl_ratio ** 2 / (4 * np.log(2))
     for w in [10, 20]:
         features[f"parkinson_vol_{w}d"] = np.sqrt(
@@ -137,7 +137,7 @@ def compute_volatility_features(df: pd.DataFrame, cfg: FeatureConfig) -> pd.Data
         )
     
     # Garman-Klass volatility (uses OHLC)
-    gk = 0.5 * np.log(high / np.maximum(low, 1e-10)) ** 2 - (2 * np.log(2) - 1) * np.log(close / np.maximum(open_p, 1e-10)) ** 2
+    gk = 0.5 * np.log(high / low) ** 2 - (2 * np.log(2) - 1) * np.log(close / open_p) ** 2
     for w in [10, 20]:
         features[f"gk_vol_{w}d"] = np.sqrt(
             np.abs(pd.Series(gk).rolling(w, min_periods=2).mean().fillna(0).values) * 252
