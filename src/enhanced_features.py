@@ -38,6 +38,12 @@ class FeatureConfig:
     seq_len: int = 60
     forecast_horizon: int = 5
     stride: int = 1               # Stride for sequence generation (1 = all, 5 = every 5th)
+
+    # Feature set: "full" (40+ features, original) or "raw_plus" (~15 stationary features)
+    feature_set: str = "full"
+
+    # Target type: "close_to_close" (default) or "open_to_close" (same-day intraday return)
+    target_type: str = "close_to_close"
     
     # Target scheme
     n_classes: int = 3            # 3 = down/flat/up, 5 = strong_down/.../strong_up, 0 = regression
@@ -376,6 +382,114 @@ def compute_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
     return features
 
 
+
+def compute_raw_plus_features(df, cfg):
+    """Simplified ~15-feature 'Raw+' set.
+
+    Designed to be stationary and low-noise:
+      - Log returns at 1, 5, 20-day horizons
+      - Realized volatility (5d, 20d) and vol regime ratio
+      - RSI (14-period, normalised to [-1, 1])
+      - VWAP distance (intraday mean-reversion signal)
+      - Relative volume (vs 20d SMA)
+      - ATR normalised (market breadth / range)
+      - Overnight gap
+      - Intraday body ratio (bull/bear candle strength)
+      - Calendar: day-of-week, turn-of-month (sin/cos)
+    """
+    close = df["close"].values.astype(np.float64)
+    high  = df["high"].values.astype(np.float64)
+    low   = df["low"].values.astype(np.float64)
+    open_ = df["open"].values.astype(np.float64)
+    vol   = df["volume"].values.astype(np.float64)
+
+    features = pd.DataFrame(index=df.index)
+
+    # --- Log returns (stationary, minimal redundancy) ---
+    for h in [1, 5, 20]:
+        shifted = pd.Series(close).shift(h).values
+        safe_shifted = np.where(shifted > 0, shifted, np.nan)
+        features[f"log_ret_{h}d"] = np.where(
+            safe_shifted > 0, np.log(close / safe_shifted), 0.0
+        ).astype(np.float32)
+
+    # --- Realized volatility ---
+    ret1 = pd.Series(close).pct_change().fillna(0).values
+    for w in [5, 20]:
+        features[f"real_vol_{w}d"] = (_rolling_std(ret1, w) * np.sqrt(252)).astype(np.float32)
+
+    # Volatility regime ratio (short vs long)
+    short_vol = _rolling_std(ret1, 5) + 1e-10
+    long_vol  = _rolling_std(ret1, 60) + 1e-10
+    features["vol_regime"] = (short_vol / long_vol).astype(np.float32)
+
+    # --- RSI (normalised to [-1, 1] to make it zero-centred) ---
+    delta = np.diff(close, prepend=close[0])
+    gain = np.where(delta > 0, delta, 0.0)
+    loss = np.where(delta < 0, -delta, 0.0)
+    period = cfg.rsi_period
+    n = len(close)
+    avg_gain = np.zeros(n)
+    avg_loss = np.zeros(n)
+    if period < n:
+        avg_gain[period] = np.mean(gain[1:period + 1])
+        avg_loss[period] = np.mean(loss[1:period + 1])
+        for i in range(period + 1, n):
+            avg_gain[i] = (avg_gain[i - 1] * (period - 1) + gain[i]) / period
+            avg_loss[i] = (avg_loss[i - 1] * (period - 1) + loss[i]) / period
+    rs = np.divide(avg_gain, avg_loss, where=avg_loss > 0, out=np.ones(n))
+    rsi_raw = 100 - 100 / (1 + rs)
+    features["rsi"] = ((rsi_raw / 50.0) - 1.0).astype(np.float32)
+
+    # --- VWAP distance ---
+    typical = (high + low + close) / 3.0
+    cum_tv  = np.cumsum(typical * vol)
+    cum_v   = np.cumsum(vol) + 1e-10
+    vwap    = cum_tv / cum_v
+    features["vwap_dist"] = ((close - vwap) / (vwap + 1e-10)).astype(np.float32)
+
+    # --- Relative volume ---
+    vol_sma20 = _sma(vol, 20)
+    features["rel_vol"] = (vol / (vol_sma20 + 1.0)).astype(np.float32)
+
+    # --- ATR normalised ---
+    tr = np.maximum(
+        high - low,
+        np.maximum(
+            np.abs(high - np.roll(close, 1)),
+            np.abs(low  - np.roll(close, 1)),
+        ),
+    )
+    atr = _ema(tr, 14)
+    features["atr_norm"] = (atr / (close + 1e-10)).astype(np.float32)
+
+    # --- Overnight gap ---
+    gap = (open_ - np.roll(close, 1)) / (np.roll(close, 1) + 1e-10)
+    gap[0] = 0.0
+    features["gap"] = gap.astype(np.float32)
+
+    # --- Body ratio (candle direction strength) ---
+    candle_range = high - low + 1e-10
+    features["body_ratio"] = ((close - open_) / candle_range).astype(np.float32)
+
+    # --- Calendar (sin/cos for cyclicality) ---
+    if "date" in df.columns:
+        dates = pd.to_datetime(df["date"])
+    else:
+        dates = pd.to_datetime(df.index)
+    dow   = dates.dt.dayofweek.values
+    month = dates.dt.month.values
+    day   = dates.dt.day.values
+    features["dow_sin"]       = np.sin(2 * np.pi * dow   / 5).astype(np.float32)
+    features["dow_cos"]       = np.cos(2 * np.pi * dow   / 5).astype(np.float32)
+    features["month_sin"]     = np.sin(2 * np.pi * month / 12).astype(np.float32)
+    features["month_cos"]     = np.cos(2 * np.pi * month / 12).astype(np.float32)
+    features["turn_of_month"] = np.where((day <= 3) | (day >= 28), 1.0, 0.0).astype(np.float32)
+
+    features = features.replace([np.inf, -np.inf], np.nan).fillna(0)
+    return features
+
+
 def normalize_features(features_df: pd.DataFrame, window: int = 60, clip: float = 5.0) -> pd.DataFrame:
     """Apply rolling z-score normalization to all features.
     
@@ -415,24 +529,26 @@ def compute_targets(
     """
     close = prices_df["close"].values
     n = len(close)
-    
-    # Future returns
-    future_returns = np.zeros(n, dtype=np.float32)
-    for i in range(n - cfg.forecast_horizon):
-        future_returns[i] = (close[i + cfg.forecast_horizon] - close[i]) / close[i]
-    
-    # Regression target (no classification)
+
+    if cfg.target_type == "open_to_close":
+        open_prices = prices_df["open"].values
+        future_returns = np.divide(
+            close - open_prices,
+            open_prices + 1e-10,
+            out=np.zeros(n, dtype=np.float32),
+            where=open_prices != 0,
+        ).astype(np.float32)
+    else:
+        future_returns = np.zeros(n, dtype=np.float32)
+        for i in range(n - cfg.forecast_horizon):
+            future_returns[i] = (close[i + cfg.forecast_horizon] - close[i]) / close[i]
+
     if cfg.n_classes == 0:
         return future_returns, future_returns
-    
-    # Classification targets
+
     labels = np.zeros(n, dtype=np.int64)
-    
-    # Only compute percentile thresholds from valid (non-zero) returns.
-    # The last forecast_horizon samples have future_return=0 (no future data),
-    # so exclude them from percentile computation.
-    valid_returns = future_returns[:n - cfg.forecast_horizon]
-    
+    valid_returns = future_returns if cfg.target_type == "open_to_close" else future_returns[:n - cfg.forecast_horizon]
+
     if cfg.n_classes == 3:
         if cfg.use_percentile_thresholds and len(valid_returns) > 0:
             lo = float(np.percentile(valid_returns, 33.3))
@@ -441,8 +557,8 @@ def compute_targets(
         else:
             lo, hi = cfg.class_thresholds_3
         labels = np.where(future_returns < lo, 0,
-                         np.where(future_returns > hi, 2, 1))
-    
+                          np.where(future_returns > hi, 2, 1))
+
     elif cfg.n_classes == 5:
         if cfg.use_percentile_thresholds and len(valid_returns) > 0:
             t1 = float(np.percentile(valid_returns, 20))
@@ -453,16 +569,16 @@ def compute_targets(
         else:
             t1, t2, t3, t4 = cfg.class_thresholds_5
         labels = np.where(future_returns < t1, 0,
-                         np.where(future_returns < t2, 1,
-                         np.where(future_returns < t3, 2,
-                         np.where(future_returns < t4, 3, 4))))
-    
+                          np.where(future_returns < t2, 1,
+                          np.where(future_returns < t3, 2,
+                          np.where(future_returns < t4, 3, 4))))
+
     elif cfg.n_classes == 11:
-        # Legacy 11-class scheme (not recommended)
         thresholds = [-0.05, -0.03, -0.01, -0.005, 0, 0.005, 0.01, 0.03, 0.05, 0.10]
         labels = np.digitize(future_returns, thresholds)
-    
+
     return labels.astype(np.int64), future_returns.astype(np.float32)
+
 
 
 def prepare_enhanced_daily_data(
@@ -497,64 +613,66 @@ def prepare_enhanced_daily_data(
     for col in required:
         if col not in df.columns:
             raise ValueError(f"Missing required column: {col}")
-    
-    # Compute all feature groups
-    feature_dfs = []
-    
-    if cfg.use_returns:
-        feature_dfs.append(compute_returns_features(df))
-    
-    if cfg.use_volatility:
-        feature_dfs.append(compute_volatility_features(df, cfg))
-    
-    if cfg.use_trend:
-        feature_dfs.append(compute_trend_features(df, cfg))
-    
-    if cfg.use_momentum:
-        feature_dfs.append(compute_momentum_features(df, cfg))
-    
-    if cfg.use_volume:
-        feature_dfs.append(compute_volume_features(df))
-    
-    if cfg.use_microstructure:
-        feature_dfs.append(compute_microstructure_features(df))
-    
-    if cfg.use_calendar:
-        feature_dfs.append(compute_calendar_features(df))
-    
-    # Extended features (require extra API calls)
-    if cfg.use_fundamentals and ticker:
-        try:
-            from src.features.fundamental_features import compute_fundamental_features
-            fund_df = compute_fundamental_features(ticker, df)
-            feature_dfs.append(fund_df)
-        except Exception as exc:
-            logger.warning(f"  Fundamental features failed for {ticker}: {exc}")
-    
-    if cfg.use_macro:
-        try:
-            from src.features.macro_features import compute_macro_features
-            macro_df = compute_macro_features(df, _cache=macro_cache)
-            feature_dfs.append(macro_df)
-        except Exception as exc:
-            logger.warning(f"  Macro features failed: {exc}")
-    
-    if cfg.use_sentiment and ticker:
-        try:
-            from src.features.sentiment_features import compute_sentiment_features
-            sent_df = compute_sentiment_features(ticker, df)
-            feature_dfs.append(sent_df)
-        except Exception as exc:
-            logger.warning(f"  Sentiment features failed for {ticker}: {exc}")
-            # Add dummy sentiment features to maintain consistent feature count
-            from src.features.sentiment_features import SENTIMENT_FEATURE_NAMES
-            dummy_sent = pd.DataFrame(
-                0.0, index=df.index, columns=SENTIMENT_FEATURE_NAMES
-            )
-            feature_dfs.append(dummy_sent)
-    
-    # Combine all features
-    all_features = pd.concat(feature_dfs, axis=1)
+    if cfg.feature_set == "raw_plus":
+        all_features = compute_raw_plus_features(df, cfg)
+    else:
+        # Compute all feature groups
+        feature_dfs = []
+
+        if cfg.use_returns:
+            feature_dfs.append(compute_returns_features(df))
+
+        if cfg.use_volatility:
+            feature_dfs.append(compute_volatility_features(df, cfg))
+
+        if cfg.use_trend:
+            feature_dfs.append(compute_trend_features(df, cfg))
+
+        if cfg.use_momentum:
+            feature_dfs.append(compute_momentum_features(df, cfg))
+
+        if cfg.use_volume:
+            feature_dfs.append(compute_volume_features(df))
+
+        if cfg.use_microstructure:
+            feature_dfs.append(compute_microstructure_features(df))
+
+        if cfg.use_calendar:
+            feature_dfs.append(compute_calendar_features(df))
+
+        # Extended features (require extra API calls)
+        if cfg.use_fundamentals and ticker:
+            try:
+                from src.features.fundamental_features import compute_fundamental_features
+                fund_df = compute_fundamental_features(ticker, df)
+                feature_dfs.append(fund_df)
+            except Exception as exc:
+                logger.warning(f"  Fundamental features failed for {ticker}: {exc}")
+
+        if cfg.use_macro:
+            try:
+                from src.features.macro_features import compute_macro_features
+                macro_df = compute_macro_features(df, _cache=macro_cache)
+                feature_dfs.append(macro_df)
+            except Exception as exc:
+                logger.warning(f"  Macro features failed: {exc}")
+
+        if cfg.use_sentiment and ticker:
+            try:
+                from src.features.sentiment_features import compute_sentiment_features
+                sent_df = compute_sentiment_features(ticker, df)
+                feature_dfs.append(sent_df)
+            except Exception as exc:
+                logger.warning(f"  Sentiment features failed for {ticker}: {exc}")
+                from src.features.sentiment_features import SENTIMENT_FEATURE_NAMES
+                dummy_sent = pd.DataFrame(
+                    0.0, index=df.index, columns=SENTIMENT_FEATURE_NAMES
+                )
+                feature_dfs.append(dummy_sent)
+
+        # Combine all features
+        all_features = pd.concat(feature_dfs, axis=1)
+
     
     # Add extra features if provided
     if extra_features_df is not None and "date" in df.columns:

@@ -79,6 +79,12 @@ class HierarchicalDataConfig:
     daily_normalize: bool = True
     daily_norm_window: int = 60
 
+    # Feature set: "full" (40+ features, default) or "raw_plus" (~15 stationary features)
+    daily_feature_set: str = "full"
+
+    # Target type: "close_to_close" (default) or "open_to_close" (intraday)
+    daily_target_type: str = "close_to_close"
+
     # Minute
     minute_normalize: bool = True
     minute_norm_window: int = 390
@@ -173,10 +179,18 @@ def split_tickers(
 # Feature computation helpers
 # ============================================================================
 
-def _compute_daily_features(df: pd.DataFrame) -> Tuple[np.ndarray, List[str]]:
-    """Compute ~51 daily features from OHLCV."""
+def _compute_daily_features(
+    df: pd.DataFrame,
+    feature_set: str = "full",
+) -> Tuple[np.ndarray, List[str]]:
+    """Compute daily features from OHLCV.
+
+    feature_set="full"     → 40+ feature pipeline (original behaviour)
+    feature_set="raw_plus" → ~15 stationary features (recommended for v9+)
+    """
     from src.enhanced_features import (
         FeatureConfig,
+        compute_raw_plus_features,
         compute_returns_features,
         compute_volatility_features,
         compute_trend_features,
@@ -185,17 +199,20 @@ def _compute_daily_features(df: pd.DataFrame) -> Tuple[np.ndarray, List[str]]:
         compute_microstructure_features,
         compute_calendar_features,
     )
-    cfg = FeatureConfig()
-    parts = [
-        compute_returns_features(df),
-        compute_volatility_features(df, cfg),
-        compute_trend_features(df, cfg),
-        compute_momentum_features(df, cfg),
-        compute_volume_features(df),
-        compute_microstructure_features(df),
-        compute_calendar_features(df),
-    ]
-    features = pd.concat(parts, axis=1)
+    cfg = FeatureConfig(feature_set=feature_set)
+    if feature_set == "raw_plus":
+        features = compute_raw_plus_features(df, cfg)
+    else:
+        parts = [
+            compute_returns_features(df),
+            compute_volatility_features(df, cfg),
+            compute_trend_features(df, cfg),
+            compute_momentum_features(df, cfg),
+            compute_volume_features(df),
+            compute_microstructure_features(df),
+            compute_calendar_features(df),
+        ]
+        features = pd.concat(parts, axis=1)
     features = features.replace([np.inf, -np.inf], np.nan).fillna(0)
     return features.values.astype(np.float32), list(features.columns)
 
@@ -425,6 +442,84 @@ REGIME_FEATURE_NAMES: List[str] = [
 ]
 
 
+# ============================================================================
+# Global minute date boundaries (for correct temporal splitting)
+# ============================================================================
+
+_MINUTE_DATE_BOUNDS: Optional[Dict[str, int]] = None  # ordinal day boundaries
+
+
+def _compute_global_minute_date_bounds(
+    tickers: List[str],
+    cfg: HierarchicalDataConfig,
+) -> Dict[str, int]:
+    """Compute global calendar-date split boundaries across ALL minute tickers.
+
+    Instead of splitting each ticker's row indices independently (which causes
+    the same market day to appear in different splits for different tickers),
+    we collect every unique trading date across all tickers, sort them, and
+    apply the 70/15/15 split to those dates.  All tickers share the same
+    date boundaries, so no date ever appears in more than one split.
+
+    Returns dict with keys 'train_end', 'val_end' (ordinal day integers).
+    Train = dates < train_end, Val = train_end <= date < val_end, Test = date >= val_end.
+    """
+    global _MINUTE_DATE_BOUNDS
+    if _MINUTE_DATE_BOUNDS is not None:
+        return _MINUTE_DATE_BOUNDS
+
+    cache = Path(cfg.cache_dir) / "minute"
+    all_dates = set()
+    for ticker in tickers:
+        date_path = cache / f"{ticker}_dates.npy"
+        if not date_path.exists():
+            continue
+        dates = np.load(date_path, mmap_mode="r")
+        unique = set(int(d) for d in dates if d > 0)
+        all_dates.update(unique)
+
+    if not all_dates:
+        logger.warning("No minute dates found — minute date bounds will be empty")
+        _MINUTE_DATE_BOUNDS = {"train_end": 0, "val_end": 0}
+        return _MINUTE_DATE_BOUNDS
+
+    sorted_dates = sorted(all_dates)
+    n = len(sorted_dates)
+    train_idx = int(n * cfg.temporal_train_frac)
+    val_idx = train_idx + int(n * cfg.temporal_val_frac)
+
+    # Boundary dates: train gets dates[:train_idx], val gets dates[train_idx:val_idx],
+    # test gets dates[val_idx:]
+    train_end_date = sorted_dates[train_idx] if train_idx < n else sorted_dates[-1] + 1
+    val_end_date = sorted_dates[val_idx] if val_idx < n else sorted_dates[-1] + 1
+
+    import datetime
+    def _ord_to_str(o):
+        try:
+            return datetime.date.fromordinal(o).isoformat()
+        except Exception:
+            return str(o)
+
+    logger.info(
+        f"Global minute date split: {n} unique dates, "
+        f"train<{_ord_to_str(train_end_date)} ({train_idx}d), "
+        f"val<{_ord_to_str(val_end_date)} ({val_idx - train_idx}d), "
+        f"test≥{_ord_to_str(val_end_date)} ({n - val_idx}d)"
+    )
+
+    _MINUTE_DATE_BOUNDS = {
+        "train_end": train_end_date,
+        "val_end": val_end_date,
+    }
+    return _MINUTE_DATE_BOUNDS
+
+
+def reset_minute_date_bounds():
+    """Reset the cached minute date bounds (call before re-preprocessing)."""
+    global _MINUTE_DATE_BOUNDS
+    _MINUTE_DATE_BOUNDS = None
+
+
 def get_regime_vector(date, cfg: HierarchicalDataConfig) -> np.ndarray:
     """Get the 8-dim regime vector for a single date."""
     regime_df = _build_regime_dataframe(cfg)
@@ -523,7 +618,7 @@ def preprocess_daily_ticker(
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
         df = df.sort_values("date").reset_index(drop=True)
 
-    feat_arr, names = _compute_daily_features(df)
+    feat_arr, names = _compute_daily_features(df, feature_set=cfg.daily_feature_set)
 
     date_col = "date" if "date" in df.columns else None
     if date_col is not None:
@@ -536,11 +631,19 @@ def preprocess_daily_ticker(
 
     close = df["close"].values.astype(np.float64)
     targets = np.full(len(close), np.nan, dtype=np.float32)
-    valid = close[:-cfg.forecast_horizon] > 0
-    ret = np.where(valid,
-        close[cfg.forecast_horizon:] / np.clip(close[:-cfg.forecast_horizon], 1e-8, None) - 1.0,
-        0.0)
-    targets[:-cfg.forecast_horizon] = np.clip(ret, -0.20, 0.20).astype(np.float32)
+
+    if getattr(cfg, "daily_target_type", "close_to_close") == "open_to_close" and "open" in df.columns:
+        # Intraday target: (close - open) / open for the row's own day.
+        # Model enters at open, exits at close — no look-ahead leakage.
+        open_ = df["open"].values.astype(np.float64)
+        intra = np.where(open_ > 0, (close - open_) / open_, 0.0).astype(np.float32)
+        targets[:] = np.clip(intra, -0.20, 0.20)
+    else:
+        valid = close[:-cfg.forecast_horizon] > 0
+        ret = np.where(valid,
+            close[cfg.forecast_horizon:] / np.clip(close[:-cfg.forecast_horizon], 1e-8, None) - 1.0,
+            0.0)
+        targets[:-cfg.forecast_horizon] = np.clip(ret, -0.20, 0.20).astype(np.float32)
 
     # Save ordinal dates for meta-model alignment and regime lookup
     if date_col is not None:
@@ -810,7 +913,9 @@ class LazyMinuteDataset(Dataset):
     """Lazy-loading dataset for minute sequences.
 
     Supports temporal splitting: when ``cfg.split_mode == "temporal"``,
-    only the rows belonging to the requested *split_name* are indexed.
+    **global calendar-date boundaries** are used so that no trading date
+    ever appears in more than one split across all tickers.  This prevents
+    same-date cross-ticker information leakage.
     """
 
     def __init__(self, tickers: List[str], cfg: HierarchicalDataConfig,
@@ -822,9 +927,17 @@ class LazyMinuteDataset(Dataset):
         self.index: List[Tuple[str, int]] = []
         self.n_features = 0
 
+        # Pre-compute global date boundaries (shared across all tickers)
+        if cfg.split_mode == "temporal":
+            bounds = _compute_global_minute_date_bounds(tickers, cfg)
+            self._date_bounds = bounds
+        else:
+            self._date_bounds = None
+
         for ticker in tickers:
             feat_path = self.cache / f"{ticker}_features.npy"
             tgt_path = self.cache / f"{ticker}_targets.npy"
+            date_path = self.cache / f"{ticker}_dates.npy"
             if not feat_path.exists() or not tgt_path.exists():
                 continue
 
@@ -833,35 +946,45 @@ class LazyMinuteDataset(Dataset):
             n_rows, n_feat = feat.shape
             self.n_features = n_feat
 
-            lo, hi = self._temporal_bounds(cfg.minute_seq_len, n_rows, cfg)
+            # Load ordinal dates for global-date splitting
+            if date_path.exists() and cfg.split_mode == "temporal":
+                dates_arr = np.load(date_path, mmap_mode="r")
+            else:
+                dates_arr = None
 
-            for i in range(lo, hi, cfg.minute_stride):
-                if not np.isnan(tgt[i - 1]):
-                    self.index.append((ticker, i))
+            warmup = cfg.minute_seq_len
+            for i in range(warmup, n_rows, cfg.minute_stride):
+                if np.isnan(tgt[i - 1]):
+                    continue
+                # Global-date split: check if this row's date falls in our split
+                if dates_arr is not None and self._date_bounds is not None:
+                    row_date = int(dates_arr[i - 1])
+                    if not self._date_in_split(row_date):
+                        continue
+                self.index.append((ticker, i))
 
         logger.info(f"LazyMinuteDataset[{split_name}]: {len(self.index):,} sequences "
                     f"from {len(tickers)} tickers, {self.n_features} features")
 
     # ------------------------------------------------------------------
-    def _temporal_bounds(self, warmup: int, n_rows: int, cfg) -> Tuple[int, int]:
-        """Return (lo, hi) row indices for the requested split."""
-        if cfg.split_mode != "temporal":
-            return warmup, n_rows
+    def _date_in_split(self, ordinal_date: int) -> bool:
+        """Check if an ordinal date belongs to this split.
 
-        usable = n_rows - warmup
-        if usable <= 0:
-            return warmup, warmup
-
-        train_end = warmup + int(usable * cfg.temporal_train_frac)
-        val_end   = train_end + int(usable * cfg.temporal_val_frac)
-        test_end  = n_rows
-
+        Uses global calendar-date boundaries:
+          train: date < train_end
+          val:   train_end <= date < val_end
+          test:  date >= val_end
+        """
+        if self._date_bounds is None:
+            return True
+        train_end = self._date_bounds["train_end"]
+        val_end = self._date_bounds["val_end"]
         if self.split_name == "train":
-            return warmup, train_end
+            return ordinal_date < train_end
         elif self.split_name == "val":
-            return train_end, val_end
-        else:
-            return val_end, test_end
+            return train_end <= ordinal_date < val_end
+        else:  # test
+            return ordinal_date >= val_end
 
     def __len__(self) -> int:
         return len(self.index)

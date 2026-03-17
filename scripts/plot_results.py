@@ -97,9 +97,15 @@ def collect_test_predictions(model_dir: str, data_cfg_kwargs: dict) -> Optional[
         logger.warning(f"Cannot collect predictions (import error): {e}")
         return None
 
-    model_path = Path(model_dir) / "forecaster_final.pt"
-    if not model_path.exists():
-        logger.warning(f"Model not found: {model_path}")
+    # Prefer forecaster_final.pt, fall back to checkpoint_phase3.pt / meta_best.pt
+    model_dir_path = Path(model_dir)
+    for candidate in ["forecaster_final.pt", "checkpoint_phase3.pt", "meta_best.pt"]:
+        model_path = model_dir_path / candidate
+        if model_path.exists():
+            logger.info(f"Loading model from {model_path}")
+            break
+    else:
+        logger.warning(f"No model checkpoint found in {model_dir}")
         return None
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -108,8 +114,18 @@ def collect_test_predictions(model_dir: str, data_cfg_kwargs: dict) -> Optional[
     forecaster.eval()
 
     data_cfg = HierarchicalDataConfig(**data_cfg_kwargs)
-    tickers = get_viable_tickers(data_cfg)
-    splits = split_tickers(tickers, data_cfg)
+
+    # Reuse saved ticker split when available to match the original training run
+    split_path = model_dir_path / "ticker_split.json"
+    if split_path.exists():
+        with open(split_path) as f:
+            splits = json.load(f)
+        logger.info(f"Loaded ticker split from {split_path} "
+                    f"(train={len(splits['train'])}, val={len(splits['val'])}, test={len(splits['test'])})")
+    else:
+        tickers = get_viable_tickers(data_cfg)
+        splits = split_tickers(tickers, data_cfg)
+
     loaders = create_dataloaders(splits, data_cfg, batch_size_daily=64,
                                   batch_size_minute=32, num_workers=0)
 
@@ -164,14 +180,25 @@ def collect_multi_horizon_predictions(model_dir: str, data_cfg_kwargs: dict,
         logger.warning(f"Cannot collect multi-horizon data: {e}")
         return None
 
-    model_path = Path(model_dir) / "forecaster_final.pt"
-    if not model_path.exists():
+    model_dir_path = Path(model_dir)
+    for candidate in ["forecaster_final.pt", "checkpoint_phase3.pt", "meta_best.pt"]:
+        model_path = model_dir_path / candidate
+        if model_path.exists():
+            break
+    else:
         return None
 
     data_cfg = HierarchicalDataConfig(**data_cfg_kwargs)
     cache = Path(data_cfg.cache_dir) / "daily"
-    tickers = get_viable_tickers(data_cfg)
-    splits = split_tickers(tickers, data_cfg)
+
+    # Reuse saved ticker split when available
+    split_path = model_dir_path / "ticker_split.json"
+    if split_path.exists():
+        with open(split_path) as f:
+            splits = json.load(f)
+    else:
+        tickers = get_viable_tickers(data_cfg)
+        splits = split_tickers(tickers, data_cfg)
     test_tickers = splits["test"]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -235,7 +262,11 @@ def collect_multi_horizon_predictions(model_dir: str, data_cfg_kwargs: dict,
                 for h in horizons:
                     if i + h >= len(close) or close[i] <= 0:
                         continue
+                    if np.isnan(close[i + h]) or np.isnan(close[i]):
+                        continue
                     target = float(close[i + h] / close[i] - 1.0)
+                    if not np.isfinite(target):
+                        continue
                     target = float(np.clip(target, -0.5, 0.5))
                     horizon_results[h]["preds"].append(pred)
                     horizon_results[h]["targets"].append(target)
@@ -245,6 +276,9 @@ def collect_multi_horizon_predictions(model_dir: str, data_cfg_kwargs: dict,
     for h, d in horizon_results.items():
         p = np.array(d["preds"])
         t = np.array(d["targets"])
+        # Drop any residual NaN/inf pairs
+        mask = np.isfinite(p) & np.isfinite(t)
+        p, t = p[mask], t[mask]
         n_samples = len(p)
         pred_std = np.std(p) if len(p) > 0 else 0.0
         tgt_std  = np.std(t) if len(t) > 0 else 0.0

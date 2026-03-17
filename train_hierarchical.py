@@ -44,11 +44,18 @@ from src.hierarchical_data import (
     split_tickers,
     _build_regime_dataframe,
     REGIME_FEATURE_NAMES,
+    reset_minute_date_bounds,
 )
 from src.hierarchical_models import (
     HierarchicalForecaster,
     HierarchicalModelConfig,
     MetaMLP,
+)
+from src.news_data import (
+    NewsDataConfig,
+    LazyNewsDataset,
+    create_news_dataloaders,
+    preprocess_all_news,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,6 +68,20 @@ def clear_gpu_memory():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
+
+
+def _check_shm_available() -> bool:
+    """Return True if /dev/shm is available and writable (needed for num_workers>0)."""
+    import tempfile
+    shm_path = "/dev/shm"
+    if not os.path.isdir(shm_path):
+        return False
+    try:
+        with tempfile.TemporaryFile(dir=shm_path):
+            pass
+        return True
+    except OSError:
+        return False
 
 
 # ============================================================================
@@ -78,6 +99,7 @@ class TrainConfig:
     scheduler: str = "cosine"
 
     epochs_phase1: int = 100
+    epochs_news: int = 80           # Phase 1.5: news encoder
     epochs_phase2: int = 100
     epochs_phase3: int = 50
     epochs_phase4: int = 10
@@ -92,6 +114,7 @@ class TrainConfig:
     batch_size_daily: int = 32
     batch_size_minute: int = 16
     batch_size_meta: int = 128
+    batch_size_news: int = 32       # News model batch size
 
     loss_fn: str = "huber"
 
@@ -111,6 +134,15 @@ class TrainConfig:
         for k, v in kwargs.items():
             if hasattr(self, k):
                 setattr(self, k, v)
+        # Auto-fallback: multi-process data loading requires /dev/shm shared
+        # memory. If it is unavailable (e.g. some container environments),
+        # silently drop to single-process loading to avoid RuntimeError.
+        if self.num_workers > 0 and not _check_shm_available():
+            logger.warning(
+                f"num_workers={self.num_workers} requested but /dev/shm is not "
+                "available — falling back to num_workers=0 (single-process loading)."
+            )
+            self.num_workers = 0
 
     def reduce_memory(self):
         """Reduce memory footprint for low-memory systems."""
@@ -365,11 +397,12 @@ class MetaTrainer:
         daily_loader: DataLoader,
         minute_loader: DataLoader,
         data_cfg: HierarchicalDataConfig,
+        news_loader: Optional[DataLoader] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Run sub-models and collect predictions + embeddings.
 
         Alignment strategy:
-          1. Run daily & minute sub-models, collecting per-sample
+          1. Run daily & minute (& news) sub-models, collecting per-sample
              (ticker, ordinal_date) keys alongside predictions/embeddings.
           2. For each sample key present in *both* daily and minute results,
              build one aligned row.
@@ -377,10 +410,11 @@ class MetaTrainer:
              use the daily sub-model outputs and zero-fill minute fields so
              the meta model still gets daily signal.
           4. Look up real regime features by date.
+          5. If news model is enabled, align news outputs by (ticker, date).
 
         Returns:
-            predictions: (N, 4)
-            emb_cat:     (N, 4*E)
+            predictions: (N, n_sub_models)
+            emb_cat:     (N, n_sub_models*E)
             regime:      (N, R)
             targets:     (N,)
         """
@@ -389,6 +423,8 @@ class MetaTrainer:
         forecaster.eval()
         E = forecaster.cfg.embedding_dim
         R = forecaster.cfg.regime_dim
+        use_news = forecaster.use_news and forecaster.news is not None
+        n_sub = 5 if use_news else 4
 
         # Build regime lookup table (ordinal_date → regime_vector)
         regime_df = _build_regime_dataframe(data_cfg)
@@ -431,6 +467,20 @@ class MetaTrainer:
                     "emb_tft":   m2["embedding"][i].cpu(),
                 }
 
+        # --- Collect news outputs keyed by (ticker, ordinal_date) ---
+        news_data: Dict[Tuple[str, int], Dict] = {}
+        if use_news and news_loader is not None:
+            for batch in news_loader:
+                x, y, ordinal_dates, tickers_batch = batch
+                x = x.to(self.device)
+                n1 = forecaster.news(x)
+                for i in range(len(y)):
+                    key = (tickers_batch[i], int(ordinal_dates[i]))
+                    news_data[key] = {
+                        "pred": n1["prediction"][i].cpu(),
+                        "emb":  n1["embedding"][i].cpu(),
+                    }
+
         # --- Align: iterate over all daily keys ---
         preds_list, embs_list, regime_list, target_list = [], [], [], []
         n_matched, n_daily_only = 0, 0
@@ -439,29 +489,29 @@ class MetaTrainer:
         for key, dd in daily_data.items():
             ticker, ord_date = key
             md = minute_data.get(key)
+            nd = news_data.get(key) if use_news else None
 
             if md is not None:
-                # Both daily and minute available for this (ticker, date)
-                pred = torch.stack([
-                    dd["pred_lstm"], dd["pred_tft"],
-                    md["pred_lstm"], md["pred_tft"],
-                ])
-                emb = torch.cat([
-                    dd["emb_lstm"], dd["emb_tft"],
-                    md["emb_lstm"], md["emb_tft"],
-                ])
+                pred = [dd["pred_lstm"], dd["pred_tft"],
+                        md["pred_lstm"], md["pred_tft"]]
+                emb = [dd["emb_lstm"], dd["emb_tft"],
+                       md["emb_lstm"], md["emb_tft"]]
                 n_matched += 1
             else:
-                # Daily only — zero-fill minute predictions/embeddings
-                pred = torch.stack([
-                    dd["pred_lstm"], dd["pred_tft"],
-                    torch.tensor(0.0), torch.tensor(0.0),
-                ])
-                emb = torch.cat([
-                    dd["emb_lstm"], dd["emb_tft"],
-                    zero_emb, zero_emb,
-                ])
+                pred = [dd["pred_lstm"], dd["pred_tft"],
+                        torch.tensor(0.0), torch.tensor(0.0)]
+                emb = [dd["emb_lstm"], dd["emb_tft"],
+                       zero_emb, zero_emb]
                 n_daily_only += 1
+
+            # Add news model outputs if enabled
+            if use_news:
+                if nd is not None:
+                    pred.append(nd["pred"])
+                    emb.append(nd["emb"])
+                else:
+                    pred.append(torch.tensor(0.0))
+                    emb.append(zero_emb)
 
             # Regime features from real market data
             if ord_date in regime_lookup:
@@ -469,21 +519,23 @@ class MetaTrainer:
             else:
                 regime_vec = torch.zeros(R)
 
-            preds_list.append(pred)
-            embs_list.append(emb)
+            preds_list.append(torch.stack(pred))
+            embs_list.append(torch.cat(emb))
             regime_list.append(regime_vec)
             target_list.append(dd["target"])
 
+        n_news_matched = sum(1 for k in daily_data if k in news_data) if use_news else 0
         logger.info(f"  Meta align: {n_matched} matched (daily+minute), "
-                    f"{n_daily_only} daily-only, {len(minute_data)} minute keys total")
+                    f"{n_daily_only} daily-only, {len(minute_data)} minute keys total"
+                    + (f", {n_news_matched} news-matched" if use_news else ""))
 
         if not preds_list:
             logger.warning("  No aligned data for meta model!")
-            return (torch.zeros(0, 4), torch.zeros(0, 4 * E),
+            return (torch.zeros(0, n_sub), torch.zeros(0, n_sub * E),
                     torch.zeros(0, R), torch.zeros(0))
 
-        predictions = torch.stack(preds_list)        # (N, 4)
-        emb_cat     = torch.stack(embs_list)          # (N, 4*E)
+        predictions = torch.stack(preds_list)        # (N, n_sub)
+        emb_cat     = torch.stack(embs_list)          # (N, n_sub*E)
         regime      = torch.stack(regime_list)         # (N, R)
         targets     = torch.stack(target_list)         # (N,)
 
@@ -496,18 +548,24 @@ class MetaTrainer:
         d_val_dl: DataLoader, m_val_dl: DataLoader,
         n_epochs: int, save_dir: str,
         data_cfg: HierarchicalDataConfig = None,
+        n_train_news_dl: Optional[DataLoader] = None,
+        n_val_news_dl: Optional[DataLoader] = None,
     ) -> Dict:
         os.makedirs(save_dir, exist_ok=True)
         best_path = os.path.join(save_dir, "meta_best.pt")
         E = forecaster.cfg.embedding_dim
+        use_news = forecaster.use_news and forecaster.news is not None
+        n_sub = 5 if use_news else 4
 
         logger.info("Collecting sub-model outputs for meta training...")
         forecaster.freeze_sub_models()
 
         train_preds, train_embs, train_regime, train_targets = \
-            self._collect_sub_outputs(forecaster, d_train_dl, m_train_dl, data_cfg)
+            self._collect_sub_outputs(forecaster, d_train_dl, m_train_dl, data_cfg,
+                                      news_loader=n_train_news_dl)
         val_preds, val_embs, val_regime, val_targets = \
-            self._collect_sub_outputs(forecaster, d_val_dl, m_val_dl, data_cfg)
+            self._collect_sub_outputs(forecaster, d_val_dl, m_val_dl, data_cfg,
+                                      news_loader=n_val_news_dl)
 
         logger.info(f"  Meta train: {len(train_targets):,} | val: {len(val_targets):,}")
 
@@ -541,7 +599,7 @@ class MetaTrainer:
                 embs_b = embs_b.to(self.device)
                 regime_b = regime_b.to(self.device)
                 targets_b = targets_b.to(self.device)
-                emb_list = [embs_b[:, i*E:(i+1)*E] for i in range(4)]
+                emb_list = [embs_b[:, i*E:(i+1)*E] for i in range(n_sub)]
 
                 self.optimizer.zero_grad()
                 out = self.meta(preds_b, emb_list, regime_b)
@@ -563,7 +621,7 @@ class MetaTrainer:
                     embs_b = embs_b.to(self.device)
                     regime_b = regime_b.to(self.device)
                     targets_b = targets_b.to(self.device)
-                    emb_list = [embs_b[:, i*E:(i+1)*E] for i in range(4)]
+                    emb_list = [embs_b[:, i*E:(i+1)*E] for i in range(n_sub)]
                     out = self.meta(preds_b, emb_list, regime_b)
                     val_total += self.criterion(out["prediction"], targets_b).item()
                     val_n += 1
@@ -621,21 +679,28 @@ class MetaTrainer:
 
 
 # ============================================================================
-# Phase 4: Joint fine-tuning
+# Phase 4: Sequential Round-Robin Fine-Tuning (memory-efficient)
 # ============================================================================
 
 class JointFineTuner:
-    """Phase 4: Fine-tune all 5 models end-to-end with small learning rate.
+    """Phase 4: Fine-tune sub-models one-at-a-time through the meta loss.
 
-    Strategy:
-      1. Unfreeze all parameters.
-      2. Collect aligned (daily, minute, regime, target) tuples via the same
-         key-based alignment as MetaTrainer.
-      3. Run a combined forward pass through all 5 models and back-prop
-         through the full graph — the meta loss gradient flows back into
-         the sub-models, adapting them to the meta-model's needs.
-      4. Use a much smaller LR than individual phases and aggressive
-         gradient clipping to avoid catastrophic forgetting.
+    Memory-efficient alternative to loading all 6 models on GPU at once.
+
+    Strategy (per round):
+      For each sub-model (lstm_d, tft_d, lstm_m, tft_m, [news]):
+        1. Move that sub-model + meta to GPU; keep others on CPU.
+        2. Unfreeze only that sub-model + meta; freeze everything else.
+        3. Forward: run the active sub-model live (with gradients), but
+           use cached frozen outputs for the other sub-models.
+        4. Backprop through active sub-model → meta only.
+        5. Move the sub-model back to CPU, advance to the next.
+
+    This gives the same end-to-end gradient signal as full joint training
+    but uses ~1/5 the GPU memory (only 1 sub-model + meta on GPU at a time).
+
+    After all sub-models get one turn, that is one "round". We repeat for
+    N rounds (= epochs_phase4).
     """
 
     def __init__(
@@ -645,235 +710,531 @@ class JointFineTuner:
         tcfg: TrainConfig,
         data_cfg: HierarchicalDataConfig,
     ):
-        self.forecaster = forecaster.to(device)
+        self.forecaster = forecaster
         self.device = device
         self.tcfg = tcfg
         self.data_cfg = data_cfg
-
-        # Very small LR to avoid destroying pre-trained weights
-        self.optimizer = torch.optim.AdamW(
-            forecaster.parameters(), lr=tcfg.lr_finetune, weight_decay=tcfg.weight_decay,
-        )
         self.criterion = nn.HuberLoss(delta=0.01) if tcfg.loss_fn == "huber" else nn.MSELoss()
 
-    def _build_aligned_dataset(
+    # ------------------------------------------------------------------
+    # Helpers: collect frozen sub-model outputs (like MetaTrainer does)
+    # ------------------------------------------------------------------
+    @torch.no_grad()
+    def _collect_frozen_outputs(
         self,
+        forecaster: HierarchicalForecaster,
         daily_loader: DataLoader,
         minute_loader: DataLoader,
-    ) -> TensorDataset:
-        """Build an aligned dataset for joint fine-tuning.
+        data_cfg: HierarchicalDataConfig,
+        news_loader: Optional[DataLoader] = None,
+    ) -> Dict[str, Dict[str, torch.Tensor]]:
+        """Run all sub-models on CPU/GPU and cache predictions + embeddings.
 
-        Unlike MetaTrainer (which only needs predictions/embeddings), we need
-        the raw input sequences so gradients can flow back through the
-        sub-models. We match daily and minute samples by (ticker, date) keys.
-
-        For samples with daily only (no minute match), we zero-fill the
-        minute input so the meta model still trains on those rows.
-
-        Returns:
-            TensorDataset with (daily_x, minute_x, regime, target)
+        Returns dict keyed by (ticker, ordinal_date) → {
+            "lstm_d_pred", "lstm_d_emb", "tft_d_pred", "tft_d_emb",
+            "lstm_m_pred", "lstm_m_emb", "tft_m_pred", "tft_m_emb",
+            "news_pred", "news_emb" (if news enabled),
+            "regime", "target",
+        }
+        But for efficiency we return separate tensors in a flat dict.
         """
-        E = self.forecaster.cfg.embedding_dim
-        R = self.forecaster.cfg.regime_dim
+        E = forecaster.cfg.embedding_dim
+        R = forecaster.cfg.regime_dim
+        use_news = forecaster.use_news and forecaster.news is not None
 
         # Build regime lookup
-        regime_df = _build_regime_dataframe(self.data_cfg)
+        regime_df = _build_regime_dataframe(data_cfg)
         regime_lookup: Dict[int, np.ndarray] = {}
         if not regime_df.empty:
             for d, row in regime_df.iterrows():
                 if hasattr(d, 'toordinal'):
                     regime_lookup[d.toordinal()] = row.values.astype(np.float32)
 
-        # Collect daily sequences keyed by (ticker, date)
-        daily_data: Dict[Tuple[str, int], Dict] = {}
+        # ---------- Run daily models ----------
+        daily_outputs: Dict[Tuple[str, int], Dict] = {}
+        forecaster.lstm_d.to(self.device).eval()
+        forecaster.tft_d.to(self.device).eval()
         for batch in daily_loader:
             x, y, ordinal_dates, tickers_batch = batch
+            x_dev = x.to(self.device)
+            d1 = forecaster.lstm_d(x_dev)
+            d2 = forecaster.tft_d(x_dev)
             for i in range(len(y)):
                 key = (tickers_batch[i], int(ordinal_dates[i]))
-                daily_data[key] = {
-                    "x": x[i],        # (seq_len, F_daily)
+                ord_date = int(ordinal_dates[i])
+                regime = torch.from_numpy(regime_lookup[ord_date]) \
+                    if ord_date in regime_lookup else torch.zeros(R)
+                daily_outputs[key] = {
+                    "lstm_d_pred": d1["prediction"][i].cpu(),
+                    "lstm_d_emb": d1["embedding"][i].cpu(),
+                    "tft_d_pred": d2["prediction"][i].cpu(),
+                    "tft_d_emb": d2["embedding"][i].cpu(),
                     "target": y[i],
+                    "regime": regime,
                 }
+        forecaster.lstm_d.cpu()
+        forecaster.tft_d.cpu()
+        clear_gpu_memory()
 
-        # Collect minute sequences keyed by (ticker, date)
-        minute_data: Dict[Tuple[str, int], Dict] = {}
+        # ---------- Run minute models ----------
+        minute_outputs: Dict[Tuple[str, int], Dict] = {}
+        forecaster.lstm_m.to(self.device).eval()
+        forecaster.tft_m.to(self.device).eval()
         for batch in minute_loader:
             x, y, ordinal_dates, tickers_batch = batch
+            x_dev = x.to(self.device)
+            m1 = forecaster.lstm_m(x_dev)
+            m2 = forecaster.tft_m(x_dev)
             for i in range(len(y)):
                 key = (tickers_batch[i], int(ordinal_dates[i]))
-                # Keep only first match per key (avoid duplicates)
-                if key not in minute_data:
-                    minute_data[key] = {"x": x[i]}
+                minute_outputs[key] = {
+                    "lstm_m_pred": m1["prediction"][i].cpu(),
+                    "lstm_m_emb": m1["embedding"][i].cpu(),
+                    "tft_m_pred": m2["prediction"][i].cpu(),
+                    "tft_m_emb": m2["embedding"][i].cpu(),
+                }
+        forecaster.lstm_m.cpu()
+        forecaster.tft_m.cpu()
+        clear_gpu_memory()
 
-        # Get dimensions from model config
-        minute_seq_len = self.forecaster.cfg.minute_seq_len
-        minute_feat_dim = self.forecaster.cfg.minute_input_dim
+        # ---------- Run news model ----------
+        news_outputs: Dict[Tuple[str, int], Dict] = {}
+        if use_news and news_loader is not None:
+            forecaster.news.to(self.device).eval()
+            for batch in news_loader:
+                x, y, ordinal_dates, tickers_batch = batch
+                x_dev = x.to(self.device)
+                n1 = forecaster.news(x_dev)
+                for i in range(len(y)):
+                    key = (tickers_batch[i], int(ordinal_dates[i]))
+                    news_outputs[key] = {
+                        "news_pred": n1["prediction"][i].cpu(),
+                        "news_emb": n1["embedding"][i].cpu(),
+                    }
+            forecaster.news.cpu()
+            clear_gpu_memory()
 
-        # Align
-        daily_xs, minute_xs, regimes, targets = [], [], [], []
-        n_matched, n_daily_only = 0, 0
-        zero_minute = torch.zeros(minute_seq_len, minute_feat_dim)
+        # ---------- Merge into aligned flat tensors ----------
+        zero_m_pred = torch.zeros(1).squeeze()
+        zero_m_emb = torch.zeros(E)
+        zero_n_pred = torch.zeros(1).squeeze()
+        zero_n_emb = torch.zeros(E)
 
-        for key, dd in daily_data.items():
-            _, ord_date = key
-            md = minute_data.get(key)
+        keys_ordered = []
+        all_preds = {name: [] for name in ["lstm_d", "tft_d", "lstm_m", "tft_m"]}
+        all_embs = {name: [] for name in ["lstm_d", "tft_d", "lstm_m", "tft_m"]}
+        if use_news:
+            all_preds["news"] = []
+            all_embs["news"] = []
+        all_regimes, all_targets = [], []
 
-            daily_xs.append(dd["x"])
-            targets.append(dd["target"])
+        for key, dd in daily_outputs.items():
+            keys_ordered.append(key)
+            all_preds["lstm_d"].append(dd["lstm_d_pred"])
+            all_preds["tft_d"].append(dd["tft_d_pred"])
+            all_embs["lstm_d"].append(dd["lstm_d_emb"])
+            all_embs["tft_d"].append(dd["tft_d_emb"])
+            all_regimes.append(dd["regime"])
+            all_targets.append(dd["target"])
 
+            md = minute_outputs.get(key)
             if md is not None:
-                minute_xs.append(md["x"])
-                n_matched += 1
+                all_preds["lstm_m"].append(md["lstm_m_pred"])
+                all_preds["tft_m"].append(md["tft_m_pred"])
+                all_embs["lstm_m"].append(md["lstm_m_emb"])
+                all_embs["tft_m"].append(md["tft_m_emb"])
             else:
-                minute_xs.append(zero_minute)
-                n_daily_only += 1
+                all_preds["lstm_m"].append(zero_m_pred)
+                all_preds["tft_m"].append(zero_m_pred)
+                all_embs["lstm_m"].append(zero_m_emb)
+                all_embs["tft_m"].append(zero_m_emb)
 
-            if ord_date in regime_lookup:
-                regimes.append(torch.from_numpy(regime_lookup[ord_date]))
+            if use_news:
+                nd = news_outputs.get(key)
+                if nd is not None:
+                    all_preds["news"].append(nd["news_pred"])
+                    all_embs["news"].append(nd["news_emb"])
+                else:
+                    all_preds["news"].append(zero_n_pred)
+                    all_embs["news"].append(zero_n_emb)
+
+        result = {
+            "keys": keys_ordered,
+            "targets": torch.stack(all_targets),
+            "regimes": torch.stack(all_regimes),
+        }
+        for name in all_preds:
+            result[f"{name}_pred"] = torch.stack(all_preds[name])
+            result[f"{name}_emb"] = torch.stack(all_embs[name])
+
+        logger.info(f"  Frozen outputs collected: {len(keys_ordered):,} samples")
+        return result
+
+    def _build_meta_input(
+        self,
+        cached: Dict[str, torch.Tensor],
+        active_name: str,
+        active_pred: torch.Tensor,
+        active_emb: torch.Tensor,
+        indices: torch.Tensor,
+    ) -> Tuple[torch.Tensor, List[torch.Tensor], torch.Tensor]:
+        """Build meta model inputs, swapping in live outputs for the active sub-model.
+
+        Returns (preds_stacked, emb_list, regime) ready for MetaMLP.
+        """
+        use_news = self.forecaster.use_news and self.forecaster.news is not None
+        sub_names = ["lstm_d", "tft_d", "lstm_m", "tft_m"]
+        if use_news:
+            sub_names.append("news")
+
+        preds_list = []
+        emb_list = []
+        for name in sub_names:
+            if name == active_name:
+                preds_list.append(active_pred)
+                emb_list.append(active_emb)
             else:
-                regimes.append(torch.zeros(R))
+                preds_list.append(cached[f"{name}_pred"][indices].to(self.device))
+                emb_list.append(cached[f"{name}_emb"][indices].to(self.device))
 
-        logger.info(f"  Joint finetune align: {n_matched} matched, "
-                    f"{n_daily_only} daily-only, {len(daily_data)} total")
+        preds = torch.stack(preds_list, dim=-1)  # (batch, N_sub)
+        regime = cached["regimes"][indices].to(self.device)
+        return preds, emb_list, regime
 
-        if not daily_xs:
-            return TensorDataset(
-                torch.zeros(0), torch.zeros(0), torch.zeros(0), torch.zeros(0)
+    # ------------------------------------------------------------------
+    # Per-sub-model fine-tune step
+    # ------------------------------------------------------------------
+    def _finetune_one_submodel(
+        self,
+        sub_model: nn.Module,
+        sub_name: str,
+        data_loader: DataLoader,
+        cached_train: Dict[str, torch.Tensor],
+        cached_val: Dict[str, torch.Tensor],
+        train_key_to_idx: Dict[Tuple[str, int], int],
+        val_key_to_idx: Dict[Tuple[str, int], int],
+        optimizer: torch.optim.Optimizer,
+        epoch_label: str,
+    ) -> Tuple[float, float, Dict]:
+        """Fine-tune one sub-model + meta for one pass over its data.
+
+        1. Move sub_model + meta to GPU
+        2. Unfreeze sub_model + meta, freeze everything else
+        3. For each batch from sub_model's data loader:
+           - Forward through sub_model (live, with gradients)
+           - Build meta input using cached outputs for other sub-models
+           - Forward through meta
+           - Backprop loss through sub_model + meta
+        4. Move sub_model back to CPU
+
+        Returns (train_loss, val_loss, val_metrics).
+        """
+        # Move active models to GPU
+        sub_model.to(self.device)
+        self.forecaster.meta.to(self.device)
+
+        # Freeze everything, then unfreeze active sub-model + meta
+        for p in self.forecaster.parameters():
+            p.requires_grad = False
+        for p in sub_model.parameters():
+            p.requires_grad = True
+        for p in self.forecaster.meta.parameters():
+            p.requires_grad = True
+
+        sub_model.train()
+        self.forecaster.meta.train()
+
+        # --- Train pass ---
+        total_loss, n_b = 0.0, 0
+        for batch in data_loader:
+            x, y, ordinal_dates, tickers_batch = batch
+            x_dev = x.to(self.device)
+            target = y.to(self.device)
+
+            # Find matching indices in the cached output arrays
+            indices = []
+            valid_mask = []
+            for i in range(len(y)):
+                key = (tickers_batch[i], int(ordinal_dates[i]))
+                idx = train_key_to_idx.get(key, -1)
+                indices.append(idx if idx >= 0 else 0)  # placeholder 0 for missing
+                valid_mask.append(idx >= 0)
+
+            indices_t = torch.tensor(indices, dtype=torch.long)
+            valid_mask_t = torch.tensor(valid_mask, dtype=torch.bool)
+
+            if not valid_mask_t.any():
+                continue
+
+            # Forward through active sub-model
+            out = sub_model(x_dev)
+            active_pred = out["prediction"]   # (batch,)
+            active_emb = out["embedding"]     # (batch, E)
+
+            # Build meta inputs (swap in live outputs for active model)
+            preds, emb_list, regime = self._build_meta_input(
+                cached_train, sub_name, active_pred, active_emb, indices_t,
             )
 
-        return TensorDataset(
-            torch.stack(daily_xs),     # (N, daily_seq, F_daily)
-            torch.stack(minute_xs),    # (N, minute_seq, F_minute)
-            torch.stack(regimes),      # (N, R)
-            torch.stack(targets),      # (N,)
+            # Forward through meta
+            meta_out = self.forecaster.meta(preds, emb_list, regime)
+            loss = self.criterion(meta_out["prediction"], target)
+
+            # Auxiliary loss on the sub-model's own prediction
+            loss = loss + 0.1 * self.criterion(active_pred, target)
+
+            optimizer.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(
+                list(sub_model.parameters()) + list(self.forecaster.meta.parameters()),
+                self.tcfg.grad_clip * 0.5,
+            )
+            optimizer.step()
+            total_loss += loss.item()
+            n_b += 1
+
+        train_loss = total_loss / max(n_b, 1)
+
+        # --- Validation pass (use val data loader for this sub-model's modality) ---
+        sub_model.eval()
+        self.forecaster.meta.eval()
+        val_preds_l, val_tgts_l = [], []
+        val_total, val_n = 0.0, 0
+
+        # For validation, we can reconstruct full meta predictions from cached
+        # outputs + the live sub-model's updated predictions
+        with torch.no_grad():
+            for batch in data_loader:
+                # Re-use same loader but only match val keys
+                x, y, ordinal_dates, tickers_batch = batch
+                x_dev = x.to(self.device)
+                target = y.to(self.device)
+
+                indices = []
+                valid_mask = []
+                for i in range(len(y)):
+                    key = (tickers_batch[i], int(ordinal_dates[i]))
+                    idx = val_key_to_idx.get(key, -1)
+                    indices.append(idx if idx >= 0 else 0)
+                    valid_mask.append(idx >= 0)
+
+                indices_t = torch.tensor(indices, dtype=torch.long)
+                valid_mask_t = torch.tensor(valid_mask, dtype=torch.bool)
+                if not valid_mask_t.any():
+                    continue
+
+                out = sub_model(x_dev)
+                preds, emb_list, regime = self._build_meta_input(
+                    cached_val, sub_name, out["prediction"], out["embedding"], indices_t,
+                )
+                meta_out = self.forecaster.meta(preds, emb_list, regime)
+
+                # Only count valid (matched) samples
+                val_total += self.criterion(
+                    meta_out["prediction"][valid_mask_t],
+                    target[valid_mask_t],
+                ).item()
+                val_n += 1
+                val_preds_l.append(meta_out["prediction"][valid_mask_t].cpu().numpy())
+                val_tgts_l.append(target[valid_mask_t].cpu().numpy())
+
+        val_loss = val_total / max(val_n, 1)
+        if val_preds_l:
+            metrics = compute_metrics(np.concatenate(val_preds_l), np.concatenate(val_tgts_l))
+        else:
+            metrics = {"ic": 0.0, "rank_ic": 0.0, "directional_accuracy": 0.5}
+
+        # Move sub-model back to CPU to free VRAM
+        sub_model.cpu()
+        clear_gpu_memory()
+
+        logger.info(
+            f"  [{epoch_label}][{sub_name:7s}] train={train_loss:.6f} | "
+            f"val={val_loss:.6f} | IC={metrics['ic']:.4f} | "
+            f"RankIC={metrics['rank_ic']:.4f}"
         )
 
+        return train_loss, val_loss, metrics
+
+    # ------------------------------------------------------------------
+    # Main training loop
+    # ------------------------------------------------------------------
     def train(
         self,
         d_train_dl: DataLoader, m_train_dl: DataLoader,
         d_val_dl: DataLoader, m_val_dl: DataLoader,
-        n_epochs: int, save_dir: str,
+        n_rounds: int, save_dir: str,
+        n_train_news_dl: Optional[DataLoader] = None,
+        n_val_news_dl: Optional[DataLoader] = None,
     ) -> Dict:
         os.makedirs(save_dir, exist_ok=True)
         best_path = os.path.join(save_dir, "finetune_best.pt")
 
-        logger.info("Collecting aligned sequences for joint fine-tuning...")
-        self.forecaster.unfreeze_all()
+        use_news = self.forecaster.use_news and self.forecaster.news is not None
 
-        train_ds = self._build_aligned_dataset(d_train_dl, m_train_dl)
-        val_ds = self._build_aligned_dataset(d_val_dl, m_val_dl)
+        # --- Step 1: Collect frozen outputs for all sub-models ---
+        logger.info("Collecting frozen sub-model outputs for round-robin fine-tuning...")
+        self.forecaster.eval()
 
-        logger.info(f"  Joint train: {len(train_ds):,} | val: {len(val_ds):,}")
-
-        train_loader = DataLoader(
-            train_ds, batch_size=self.tcfg.batch_size_meta,
-            shuffle=True, pin_memory=True,
+        cached_train = self._collect_frozen_outputs(
+            self.forecaster, d_train_dl, m_train_dl, self.data_cfg,
+            news_loader=n_train_news_dl,
         )
-        val_loader = DataLoader(
-            val_ds, batch_size=self.tcfg.batch_size_meta, pin_memory=True,
-        )
-
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=n_epochs, eta_min=1e-7,
+        cached_val = self._collect_frozen_outputs(
+            self.forecaster, d_val_dl, m_val_dl, self.data_cfg,
+            news_loader=n_val_news_dl,
         )
 
-        history = {"train_loss": [], "val_loss": [], "val_ic": []}
+        # Build key → index maps for fast lookup
+        train_key_to_idx = {k: i for i, k in enumerate(cached_train["keys"])}
+        val_key_to_idx = {k: i for i, k in enumerate(cached_val["keys"])}
+
+        logger.info(f"  Train samples: {len(train_key_to_idx):,} | Val: {len(val_key_to_idx):,}")
+
+        # --- Step 2: Set up sub-model → data loader mapping ---
+        sub_models = [
+            ("lstm_d", self.forecaster.lstm_d, d_train_dl, d_val_dl),
+            ("tft_d",  self.forecaster.tft_d,  d_train_dl, d_val_dl),
+            ("lstm_m", self.forecaster.lstm_m, m_train_dl, m_val_dl),
+            ("tft_m",  self.forecaster.tft_m,  m_train_dl, m_val_dl),
+        ]
+        if use_news and n_train_news_dl is not None:
+            sub_models.append(
+                ("news", self.forecaster.news, n_train_news_dl, n_val_news_dl)
+            )
+
+        # Each sub-model gets its own optimizer (created fresh per round to
+        # avoid stale momentum from previous rounds on frozen params)
+        history = {"train_loss": [], "val_loss": [], "val_ic": [], "val_rank_ic": []}
         best_val = float("inf")
+        best_ic = -float("inf")
         patience_ctr = 0
+        use_ic_stopping = (self.tcfg.early_stop_metric == "ic")
 
-        total_params = sum(p.numel() for p in self.forecaster.parameters() if p.requires_grad)
+        total_params = sum(p.numel() for p in self.forecaster.parameters())
         logger.info(f"\n{'='*60}")
-        logger.info(f"Joint fine-tuning for {n_epochs} epochs ({total_params:,} params)")
+        logger.info(f"Sequential round-robin fine-tuning for {n_rounds} rounds")
+        logger.info(f"  {len(sub_models)} sub-models, {total_params:,} total params")
         logger.info(f"  LR={self.tcfg.lr_finetune:.1e}, grad_clip={self.tcfg.grad_clip}")
+        logger.info(f"  Only 1 sub-model + meta on GPU at a time (memory-safe)")
         logger.info(f"{'='*60}")
 
-        for epoch in range(1, n_epochs + 1):
+        for rnd in range(1, n_rounds + 1):
             t0 = time.time()
+            round_train_losses = []
+            round_val_losses = []
+            round_val_ics = []
 
-            # --- Train ---
-            self.forecaster.train()
-            total_loss, n_b = 0.0, 0
-            for daily_x, minute_x, regime, target in train_loader:
-                daily_x = daily_x.to(self.device)
-                minute_x = minute_x.to(self.device)
-                regime = regime.to(self.device)
-                target = target.to(self.device)
-
-                self.optimizer.zero_grad()
-                out = self.forecaster(daily_x, minute_x, regime)
-                loss = self.criterion(out["prediction"], target)
-
-                # Optional: add sub-model auxiliary losses for stability
-                aux_weight = 0.1
-                for sub_key in ["lstm_d", "tft_d", "lstm_m", "tft_m"]:
-                    sub_pred = out[sub_key]["prediction"]
-                    loss = loss + aux_weight * self.criterion(sub_pred, target)
-
-                loss.backward()
-                nn.utils.clip_grad_norm_(
-                    self.forecaster.parameters(), self.tcfg.grad_clip * 0.5
+            for sub_name, sub_model, train_dl, val_dl in sub_models:
+                # Fresh optimizer per sub-model per round
+                optimizer = torch.optim.AdamW(
+                    list(sub_model.parameters()) + list(self.forecaster.meta.parameters()),
+                    lr=self.tcfg.lr_finetune,
+                    weight_decay=self.tcfg.weight_decay,
                 )
-                self.optimizer.step()
-                total_loss += loss.item()
-                n_b += 1
 
-            train_loss = total_loss / max(n_b, 1)
+                tr_loss, v_loss, v_metrics = self._finetune_one_submodel(
+                    sub_model, sub_name,
+                    train_dl, cached_train, cached_val,
+                    train_key_to_idx, val_key_to_idx,
+                    optimizer, f"Rnd {rnd:2d}",
+                )
 
-            # --- Validate ---
-            self.forecaster.eval()
-            val_preds_l, val_tgts_l = [], []
-            val_total, val_n = 0.0, 0
-            with torch.no_grad():
-                for daily_x, minute_x, regime, target in val_loader:
-                    daily_x = daily_x.to(self.device)
-                    minute_x = minute_x.to(self.device)
-                    regime = regime.to(self.device)
-                    target = target.to(self.device)
+                round_train_losses.append(tr_loss)
+                round_val_losses.append(v_loss)
+                round_val_ics.append(v_metrics["ic"])
 
-                    out = self.forecaster(daily_x, minute_x, regime)
-                    val_total += self.criterion(out["prediction"], target).item()
-                    val_n += 1
-                    val_preds_l.append(out["prediction"].cpu().numpy())
-                    val_tgts_l.append(target.cpu().numpy())
+                # Update cached outputs for this sub-model after fine-tuning
+                # so the next sub-model in this round sees the updated outputs
+                self._update_cached_outputs(
+                    sub_model, sub_name, train_dl, cached_train, train_key_to_idx,
+                )
+                self._update_cached_outputs(
+                    sub_model, sub_name, val_dl, cached_val, val_key_to_idx,
+                )
 
-            val_loss = val_total / max(val_n, 1)
-            metrics = compute_metrics(
-                np.concatenate(val_preds_l), np.concatenate(val_tgts_l)
-            )
             elapsed = time.time() - t0
+            avg_train = np.mean(round_train_losses)
+            avg_val = np.mean(round_val_losses)
+            avg_ic = np.mean(round_val_ics)
 
-            history["train_loss"].append(train_loss)
-            history["val_loss"].append(val_loss)
-            history["val_ic"].append(metrics["ic"])
+            history["train_loss"].append(avg_train)
+            history["val_loss"].append(avg_val)
+            history["val_ic"].append(avg_ic)
+            history["val_rank_ic"].append(avg_ic)  # approximate
 
             logger.info(
-                f"[Joint] Epoch {epoch:3d}/{n_epochs} | "
-                f"train={train_loss:.6f} | val={val_loss:.6f} | "
-                f"IC={metrics['ic']:.4f} | RankIC={metrics['rank_ic']:.4f} | "
-                f"DirAcc={metrics['directional_accuracy']:.3f} | {elapsed:.1f}s"
+                f"[Joint] Round {rnd:3d}/{n_rounds} | "
+                f"avg_train={avg_train:.6f} | avg_val={avg_val:.6f} | "
+                f"avg_IC={avg_ic:.4f} | {elapsed:.1f}s"
             )
-            scheduler.step()
 
-            if val_loss < best_val - self.tcfg.min_delta:
-                best_val = val_loss
-                patience_ctr = 0
-                self.forecaster.save(best_path)
-                logger.info(f"  ★ New best joint val={val_loss:.6f}")
+            # Early stopping check
+            if use_ic_stopping:
+                improved = avg_ic > best_ic + self.tcfg.ic_min_delta
+                if improved or (best_ic <= 0 and avg_val < best_val - self.tcfg.min_delta):
+                    if improved:
+                        best_ic = avg_ic
+                    best_val = avg_val
+                    patience_ctr = 0
+                    self.forecaster.save(best_path)
+                    logger.info(f"  ★ New best joint IC={avg_ic:.4f} | val={avg_val:.6f}")
+                else:
+                    patience_ctr += 1
+                    if patience_ctr >= self.tcfg.patience:
+                        logger.info(f"  Early stopping at round {rnd} (best IC={best_ic:.4f})")
+                        break
             else:
-                patience_ctr += 1
-                if patience_ctr >= self.tcfg.patience:
-                    logger.info(f"  Early stopping at epoch {epoch}")
-                    break
+                if avg_val < best_val - self.tcfg.min_delta:
+                    best_val = avg_val
+                    patience_ctr = 0
+                    self.forecaster.save(best_path)
+                    logger.info(f"  ★ New best joint val={avg_val:.6f}")
+                else:
+                    patience_ctr += 1
+                    if patience_ctr >= self.tcfg.patience:
+                        logger.info(f"  Early stopping at round {rnd}")
+                        break
 
         # Reload best weights
-        best_ckpt = torch.load(best_path, map_location=self.device, weights_only=False)
-        self.forecaster.lstm_d.load_state_dict(best_ckpt["lstm_d"])
-        self.forecaster.tft_d.load_state_dict(best_ckpt["tft_d"])
-        self.forecaster.lstm_m.load_state_dict(best_ckpt["lstm_m"])
-        self.forecaster.tft_m.load_state_dict(best_ckpt["tft_m"])
-        self.forecaster.meta.load_state_dict(best_ckpt["meta"])
+        if os.path.exists(best_path):
+            best_ckpt = torch.load(best_path, map_location=self.device, weights_only=False)
+            self.forecaster.lstm_d.load_state_dict(best_ckpt["lstm_d"])
+            self.forecaster.tft_d.load_state_dict(best_ckpt["tft_d"])
+            self.forecaster.lstm_m.load_state_dict(best_ckpt["lstm_m"])
+            self.forecaster.tft_m.load_state_dict(best_ckpt["tft_m"])
+            self.forecaster.meta.load_state_dict(best_ckpt["meta"])
+            if "news" in best_ckpt and use_news:
+                self.forecaster.news.load_state_dict(best_ckpt["news"])
         _save_training_curve(history, "Joint", save_dir)
         return history
+
+    @torch.no_grad()
+    def _update_cached_outputs(
+        self,
+        sub_model: nn.Module,
+        sub_name: str,
+        data_loader: DataLoader,
+        cached: Dict[str, torch.Tensor],
+        key_to_idx: Dict[Tuple[str, int], int],
+    ):
+        """Re-run a sub-model after fine-tuning and update cached preds/embs.
+
+        This way the next sub-model in the round sees the updated outputs.
+        """
+        sub_model.to(self.device).eval()
+        for batch in data_loader:
+            x, y, ordinal_dates, tickers_batch = batch
+            x_dev = x.to(self.device)
+            out = sub_model(x_dev)
+            for i in range(len(y)):
+                key = (tickers_batch[i], int(ordinal_dates[i]))
+                idx = key_to_idx.get(key, -1)
+                if idx >= 0:
+                    cached[f"{sub_name}_pred"][idx] = out["prediction"][i].cpu()
+                    cached[f"{sub_name}_emb"][idx] = out["embedding"][i].cpu()
+        sub_model.cpu()
+        clear_gpu_memory()
 
 
 # ============================================================================
@@ -908,9 +1269,6 @@ def run_pipeline(
     os.makedirs(tcfg.output_dir, exist_ok=True)
     os.makedirs(tcfg.log_dir, exist_ok=True)
 
-    with open(os.path.join(tcfg.output_dir, "train_config.json"), "w") as f:
-        json.dump({k: v for k, v in vars(tcfg).items()}, f, indent=2, default=str)
-
     # ------------------------------------------------------------------
     # Discover tickers and split
     # ------------------------------------------------------------------
@@ -918,11 +1276,27 @@ def run_pipeline(
     logger.info("STEP 0: Discover tickers and split")
     logger.info("=" * 70)
 
-    tickers = get_viable_tickers(data_cfg)
-    splits = split_tickers(tickers, data_cfg)
+    # When resuming, reuse the exact ticker split from the original run to
+    # avoid data leakage and ensure consistent train/val/test sets.
+    saved_split_path = os.path.join(tcfg.output_dir, "ticker_split.json")
+    if resume_path and os.path.exists(saved_split_path):
+        logger.info(f"Resuming: loading saved ticker split from {saved_split_path}")
+        with open(saved_split_path) as f:
+            splits = json.load(f)
+        tickers = splits["train"] + splits["val"] + splits["test"]
+        logger.info(f"Loaded {len(tickers)} tickers from saved split "
+                    f"(train={len(splits['train'])}, val={len(splits['val'])}, test={len(splits['test'])})")
+    else:
+        tickers = get_viable_tickers(data_cfg)
+        splits = split_tickers(tickers, data_cfg)
+        with open(saved_split_path, "w") as f:
+            json.dump(splits, f, indent=2)
 
-    with open(os.path.join(tcfg.output_dir, "ticker_split.json"), "w") as f:
-        json.dump(splits, f, indent=2)
+    # Only write train_config.json for fresh runs (don't overwrite the original).
+    config_path = os.path.join(tcfg.output_dir, "train_config.json")
+    if not (resume_path and os.path.exists(config_path)):
+        with open(config_path, "w") as f:
+            json.dump({k: v for k, v in vars(tcfg).items()}, f, indent=2, default=str)
 
     # ------------------------------------------------------------------
     # PHASE 0: Preprocess (compute features → cache as .npy)
@@ -931,7 +1305,27 @@ def run_pipeline(
         logger.info("\n" + "=" * 70)
         logger.info("PHASE 0: Preprocessing features to disk cache")
         logger.info("=" * 70)
+        reset_minute_date_bounds()  # clear stale cached boundaries
         preprocess_all(tickers, data_cfg, force=force_preprocess)
+
+        # Also preprocess news sequences if news model is enabled
+        if model_cfg.use_news_model:
+            logger.info("Preprocessing news sequences (from cached FinBERT embeddings)...")
+            news_cfg = NewsDataConfig(
+                seq_len=data_cfg.daily_seq_len,
+                stride=data_cfg.daily_stride,
+                forecast_horizon=data_cfg.forecast_horizon,
+                split_mode=data_cfg.split_mode,
+                temporal_train_frac=data_cfg.temporal_train_frac,
+                temporal_val_frac=data_cfg.temporal_val_frac,
+                temporal_test_frac=data_cfg.temporal_test_frac,
+            )
+            preprocess_all_news(
+                tickers, news_cfg,
+                daily_cache_dir=str(Path(data_cfg.cache_dir) / "daily"),
+                force=force_preprocess,
+            )
+
         logger.info("Phase 0 complete ✓")
         clear_gpu_memory()
 
@@ -939,6 +1333,7 @@ def run_pipeline(
     # Create dataloaders (lazy, near-zero RAM)
     # ------------------------------------------------------------------
     needs_data = bool(set(phases) & {1, 2, 3, 4})
+    news_loaders = None
     if needs_data:
         logger.info("\nCreating lazy dataloaders...")
         loaders = create_dataloaders(
@@ -947,6 +1342,25 @@ def run_pipeline(
             batch_size_minute=tcfg.batch_size_minute,
             num_workers=tcfg.num_workers,
         )
+
+        # Create news dataloaders if news model is enabled
+        if model_cfg.use_news_model:
+            news_cfg = NewsDataConfig(
+                seq_len=data_cfg.daily_seq_len,
+                stride=data_cfg.daily_stride,
+                forecast_horizon=data_cfg.forecast_horizon,
+                split_mode=data_cfg.split_mode,
+                temporal_train_frac=data_cfg.temporal_train_frac,
+                temporal_val_frac=data_cfg.temporal_val_frac,
+                temporal_test_frac=data_cfg.temporal_test_frac,
+            )
+            news_loaders = create_news_dataloaders(
+                splits, news_cfg,
+                daily_cache_dir=str(Path(data_cfg.cache_dir) / "daily"),
+                batch_size=tcfg.batch_size_news,
+                num_workers=tcfg.num_workers,
+            )
+            logger.info(f"  News loaders: {news_loaders['n_features']} features")
 
     # ------------------------------------------------------------------
     # Create or resume model
@@ -958,9 +1372,17 @@ def run_pipeline(
         else:
             model_cfg.daily_input_dim = loaders["daily_n_features"]
             model_cfg.minute_input_dim = loaders["minute_n_features"]
+            if model_cfg.use_news_model and news_loaders is not None:
+                model_cfg.news_input_dim = news_loaders["n_features"]
+                model_cfg.news_seq_len = data_cfg.daily_seq_len
+                model_cfg.n_sub_models = 5
+            else:
+                model_cfg.n_sub_models = 4
             logger.info(f"\nCreating HierarchicalForecaster:")
             logger.info(f"  Daily:  {model_cfg.daily_input_dim} features, seq_len={model_cfg.daily_seq_len}")
             logger.info(f"  Minute: {model_cfg.minute_input_dim} features, seq_len={model_cfg.minute_seq_len}")
+            if model_cfg.use_news_model:
+                logger.info(f"  News:   {model_cfg.news_input_dim} features, seq_len={model_cfg.news_seq_len}")
             forecaster = HierarchicalForecaster(model_cfg)
 
         forecaster = forecaster.to(device)
@@ -984,6 +1406,26 @@ def run_pipeline(
 
         forecaster.save(os.path.join(tcfg.output_dir, "checkpoint_phase1.pt"))
         logger.info("Phase 1 complete ✓")
+        clear_gpu_memory()
+
+    # ------------------------------------------------------------------
+    # PHASE 1.5: Train news encoder (if enabled)
+    # ------------------------------------------------------------------
+    if 1 in phases and model_cfg.use_news_model and news_loaders is not None:
+        logger.info("\n" + "=" * 70)
+        logger.info("PHASE 1.5: Training News Encoder")
+        logger.info("=" * 70)
+
+        train_dl = news_loaders["train"]
+        val_dl = news_loaders["val"]
+
+        if len(train_dl.dataset) > 0:
+            trainer = SubModelTrainer(forecaster.news, "News", device, tcfg)
+            trainer.train(train_dl, val_dl, tcfg.epochs_news, tcfg.output_dir)
+            forecaster.save(os.path.join(tcfg.output_dir, "checkpoint_phase1_5.pt"))
+            logger.info("Phase 1.5 complete ✓")
+        else:
+            logger.warning("No news training data available — skipping Phase 1.5")
         clear_gpu_memory()
 
     # ------------------------------------------------------------------
@@ -1023,6 +1465,8 @@ def run_pipeline(
             loaders["daily"]["test"], loaders["minute"]["test"],    # meta VAL   = sub-model test
             tcfg.epochs_phase3, tcfg.output_dir,
             data_cfg=data_cfg,
+            n_train_news_dl=news_loaders["val"] if news_loaders else None,
+            n_val_news_dl=news_loaders["test"] if news_loaders else None,
         )
 
         forecaster.save(os.path.join(tcfg.output_dir, "checkpoint_phase3.pt"))
@@ -1042,6 +1486,8 @@ def run_pipeline(
             loaders["daily"]["train"], loaders["minute"]["train"],
             loaders["daily"]["val"], loaders["minute"]["val"],
             tcfg.epochs_phase4, tcfg.output_dir,
+            n_train_news_dl=news_loaders["train"] if news_loaders else None,
+            n_val_news_dl=news_loaders["val"] if news_loaders else None,
         )
 
         forecaster.save(os.path.join(tcfg.output_dir, "checkpoint_phase4.pt"))
@@ -1092,6 +1538,23 @@ def run_pipeline(
                 logger.info(f"  {name:8s} | IC={metrics['ic']:.4f} | "
                             f"RankIC={metrics['rank_ic']:.4f} | DirAcc={metrics['directional_accuracy']:.3f}")
 
+        # Evaluate news sub-model on test (if enabled)
+        if forecaster.use_news and forecaster.news is not None and news_loaders is not None:
+            test_dl = news_loaders["test"]
+            if len(test_dl.dataset) > 0:
+                preds, tgts = [], []
+                with torch.no_grad():
+                    for batch in test_dl:
+                        x, y = batch[0], batch[1]
+                        x = x.to(device)
+                        out = forecaster.news(x)
+                        preds.append(out["prediction"].cpu().numpy())
+                        tgts.append(y.numpy())
+                metrics = compute_metrics(np.concatenate(preds), np.concatenate(tgts))
+                results["NEWS"] = metrics
+                logger.info(f"  {'NEWS':8s} | IC={metrics['ic']:.4f} | "
+                            f"RankIC={metrics['rank_ic']:.4f} | DirAcc={metrics['directional_accuracy']:.3f}")
+
         # Evaluate full ensemble (meta model) on test
         # Note: the meta model was trained on val split and validated on test
         # split, so test is NOT fully held-out for the meta model (it was
@@ -1104,9 +1567,11 @@ def run_pipeline(
                 forecaster,
                 loaders["daily"]["test"], loaders["minute"]["test"],
                 data_cfg,
+                news_loader=news_loaders["test"] if news_loaders else None,
             )
         if len(test_targets) > 0:
             E = forecaster.cfg.embedding_dim
+            n_sub = forecaster.meta.n_sub_models
             all_meta_preds, all_meta_tgts = [], []
             test_ds = TensorDataset(test_preds, test_embs, test_regime, test_targets)
             test_meta_dl = DataLoader(test_ds, batch_size=tcfg.batch_size_meta)
@@ -1116,7 +1581,7 @@ def run_pipeline(
                     preds_b = preds_b.to(device)
                     embs_b = embs_b.to(device)
                     regime_b = regime_b.to(device)
-                    emb_list = [embs_b[:, i*E:(i+1)*E] for i in range(4)]
+                    emb_list = [embs_b[:, i*E:(i+1)*E] for i in range(n_sub)]
                     out = forecaster.meta(preds_b, emb_list, regime_b)
                     all_meta_preds.append(out["prediction"].cpu().numpy())
                     all_meta_tgts.append(targets_b.numpy())
@@ -1190,6 +1655,14 @@ def main():
                         choices=["ic", "loss"],
                         help="Metric to use for early stopping (default: ic)")
     parser.add_argument("--num-workers", type=int, default=4)
+    parser.add_argument("--use-news", action="store_true",
+                        help="Enable the FinBERT news encoder sub-model (Phase 1.5).")
+    parser.add_argument("--feature-set", type=str, default="full",
+                        choices=["full", "raw_plus"],
+                        help="Daily feature set: 'full' (40+ features) or 'raw_plus' (~15 stationary features).")
+    parser.add_argument("--target-type", type=str, default="close_to_close",
+                        choices=["close_to_close", "open_to_close"],
+                        help="Prediction target: 'close_to_close' (next-day) or 'open_to_close' (intraday).")
     parser.add_argument("--force-preprocess", action="store_true",
                         help="Recompute cached features even if present.")
     parser.add_argument("--low-memory", action="store_true",
@@ -1241,11 +1714,14 @@ def main():
         daily_stride=args.daily_stride,
         minute_stride=args.minute_stride,
         split_mode=args.split_mode,
+        daily_feature_set=args.feature_set,
+        daily_target_type=args.target_type,
     )
 
     model_cfg = HierarchicalModelConfig(
         daily_seq_len=args.daily_seq_len,
         minute_seq_len=args.minute_seq_len,
+        use_news_model=args.use_news,
     )
 
     run_pipeline(

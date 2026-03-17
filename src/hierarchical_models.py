@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Tuple
 import logging
 
 from src.models.temporal_fusion_transformer import TFTConfig, TemporalFusionTransformer
+from src.news_encoder import NewsEncoder, NewsEncoderConfig
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,14 @@ class HierarchicalModelConfig:
     minute_n_heads: int = 4
     minute_dropout: float = 0.15
 
+    # News model
+    news_input_dim: int = 774       # 768 FinBERT + 6 sentiment features
+    news_seq_len: int = 720         # Same as daily
+    news_hidden_dim: int = 128
+    news_n_layers: int = 2
+    news_dropout: float = 0.15
+    use_news_model: bool = True     # Toggle news sub-model
+
     # Shared
     embedding_dim: int = 64         # Embedding size for all sub-models
 
@@ -58,6 +67,7 @@ class HierarchicalModelConfig:
     meta_hidden_dim: int = 128
     meta_n_layers: int = 3
     meta_dropout: float = 0.2
+    n_sub_models: int = 5           # 4 price models + 1 news model (or 4 if no news)
 
 
 # ============================================================================
@@ -219,17 +229,18 @@ class RegressionTFT(nn.Module):
 # ============================================================================
 
 class MetaMLP(nn.Module):
-    """Small neural network that fuses four sub-model predictions into
+    """Small neural network that fuses sub-model predictions into
     a single next-day return forecast.
 
     Input vector (per sample):
-      - 4 scalar predictions     (LSTM_D, TFT_D, LSTM_M, TFT_M)
-      - 4 × embedding_dim        (64 × 4 = 256)
+      - N scalar predictions     (LSTM_D, TFT_D, LSTM_M, TFT_M, [News])
+      - N × embedding_dim        (64 × N)
       - regime_dim               (8)
-    Total default = 4 + 256 + 8 = 268
+    Total default (5 models) = 5 + 1 + 320 + 8 = 334
+    Total default (4 models) = 4 + 1 + 256 + 8 = 269
 
     The network learns:
-      - How to weight daily vs minute predictions
+      - How to weight daily vs minute vs news predictions
       - When to trust which model (regime-dependent)
       - Non-linear interactions between model signals
     """
@@ -241,13 +252,15 @@ class MetaMLP(nn.Module):
         hidden_dim: int = 128,
         n_layers: int = 3,
         dropout: float = 0.2,
+        n_sub_models: int = 5,
     ):
         super().__init__()
         self.embedding_dim = embedding_dim
         self.regime_dim = regime_dim
+        self.n_sub_models = n_sub_models
 
-        # 4 raw preds + 1 weighted pred + 4 embs + regime
-        input_dim = 4 + 1 + 4 * embedding_dim + regime_dim
+        # N raw preds + 1 weighted pred + N embs + regime
+        input_dim = n_sub_models + 1 + n_sub_models * embedding_dim + regime_dim
 
         layers = []
         prev_dim = input_dim
@@ -263,11 +276,11 @@ class MetaMLP(nn.Module):
         self.trunk = nn.Sequential(*layers)
         self.output_head = nn.Linear(prev_dim, 1)
 
-        # Interpretable attention: learns D-vs-M weighting from regime
+        # Interpretable attention: learns D-vs-M-vs-News weighting from regime
         self.attention = nn.Sequential(
             nn.Linear(regime_dim, 32),
             nn.GELU(),
-            nn.Linear(32, 4),           # weights for 4 sub-models
+            nn.Linear(32, n_sub_models),  # weights for N sub-models
             nn.Softmax(dim=-1),
         )
 
@@ -316,20 +329,22 @@ class MetaMLP(nn.Module):
 # ============================================================================
 
 class HierarchicalForecaster(nn.Module):
-    """Complete 5-model hierarchical forecaster.
+    """Complete hierarchical forecaster with up to 6 models.
 
     Models:
         1. lstm_d   — RegressionLSTM on daily data
         2. tft_d    — RegressionTFT  on daily data
         3. lstm_m   — RegressionLSTM on minute data
         4. tft_m    — RegressionTFT  on minute data
-        5. meta     — MetaMLP combining all four
+        5. news     — NewsEncoder on FinBERT embeddings (optional)
+        6. meta     — MetaMLP combining all sub-models
 
     Training phases:
-        Phase 1: Train lstm_d and tft_d on daily data (parallel or sequential)
-        Phase 2: Train lstm_m and tft_m on minute data
-        Phase 3: Freeze sub-models, train meta on combined predictions
-        Phase 4: (Optional) Fine-tune all jointly with small LR
+        Phase 1:   Train lstm_d and tft_d on daily data
+        Phase 1.5: Train news encoder on news embeddings (if enabled)
+        Phase 2:   Train lstm_m and tft_m on minute data
+        Phase 3:   Freeze sub-models, train meta on combined predictions
+        Phase 4:   (Optional) Fine-tune all jointly with small LR
     """
 
     def __init__(self, cfg: HierarchicalModelConfig):
@@ -372,6 +387,26 @@ class HierarchicalForecaster(nn.Module):
             embedding_dim=cfg.embedding_dim,
         )
 
+        # --- News model (optional) ---
+        self.use_news = cfg.use_news_model
+        if self.use_news:
+            news_cfg = NewsEncoderConfig(
+                finbert_dim=768,
+                sentiment_dim=6,
+                input_dim=cfg.news_input_dim,
+                proj_dim=cfg.news_hidden_dim,
+                hidden_dim=cfg.news_hidden_dim,
+                n_layers=cfg.news_n_layers,
+                dropout=cfg.news_dropout,
+                seq_len=cfg.news_seq_len,
+                embedding_dim=cfg.embedding_dim,
+            )
+            self.news = NewsEncoder(news_cfg)
+            n_sub = 5
+        else:
+            self.news = None
+            n_sub = 4
+
         # --- Meta model ---
         self.meta = MetaMLP(
             embedding_dim=cfg.embedding_dim,
@@ -379,6 +414,7 @@ class HierarchicalForecaster(nn.Module):
             hidden_dim=cfg.meta_hidden_dim,
             n_layers=cfg.meta_n_layers,
             dropout=cfg.meta_dropout,
+            n_sub_models=n_sub,
         )
 
         self._log_params()
@@ -391,6 +427,8 @@ class HierarchicalForecaster(nn.Module):
             "tft_m": self.tft_m.count_parameters(),
             "meta": self.meta.count_parameters(),
         }
+        if self.use_news and self.news is not None:
+            parts["news"] = self.news.count_parameters()
         total = sum(parts.values())
         logger.info("Hierarchical Forecaster parameter count:")
         for name, count in parts.items():
@@ -401,11 +439,14 @@ class HierarchicalForecaster(nn.Module):
     # Freeze / unfreeze helpers
     # ------------------------------------------------------------------
     def freeze_sub_models(self):
-        """Freeze all 4 sub-models (for meta training)."""
-        for m in [self.lstm_d, self.tft_d, self.lstm_m, self.tft_m]:
+        """Freeze all sub-models (for meta training)."""
+        models = [self.lstm_d, self.tft_d, self.lstm_m, self.tft_m]
+        if self.use_news and self.news is not None:
+            models.append(self.news)
+        for m in models:
             for p in m.parameters():
                 p.requires_grad = False
-        logger.info("Sub-models frozen for meta training")
+        logger.info(f"Sub-models frozen for meta training ({len(models)} models)")
 
     def unfreeze_all(self):
         """Unfreeze everything (for joint fine-tuning)."""
@@ -421,13 +462,14 @@ class HierarchicalForecaster(nn.Module):
         daily_x: torch.Tensor,             # (batch, daily_seq, daily_feat)
         minute_x: torch.Tensor,            # (batch, minute_seq, minute_feat)
         regime: torch.Tensor,              # (batch, regime_dim)
+        news_x: Optional[torch.Tensor] = None,  # (batch, news_seq, news_feat) or None
     ) -> Dict[str, torch.Tensor]:
-        """Full forward pass through all 5 models.
+        """Full forward pass through all models.
 
         Returns dict with:
             prediction:         (batch,) — meta model output
-            sub_predictions:    (batch, 4) — [lstm_d, tft_d, lstm_m, tft_m]
-            attention_weights:  (batch, 4) — learned sub-model weights
+            sub_predictions:    (batch, N) — [lstm_d, tft_d, lstm_m, tft_m, (news)]
+            attention_weights:  (batch, N) — learned sub-model weights
         """
         # Sub-model forward passes
         d1 = self.lstm_d(daily_x)
@@ -435,40 +477,52 @@ class HierarchicalForecaster(nn.Module):
         m1 = self.lstm_m(minute_x)
         m2 = self.tft_m(minute_x)
 
-        preds = torch.stack([
-            d1["prediction"], d2["prediction"],
-            m1["prediction"], m2["prediction"],
-        ], dim=-1)                                      # (batch, 4)
+        pred_list = [d1["prediction"], d2["prediction"],
+                     m1["prediction"], m2["prediction"]]
+        emb_list = [d1["embedding"], d2["embedding"],
+                    m1["embedding"], m2["embedding"]]
 
-        embeddings = [
-            d1["embedding"], d2["embedding"],
-            m1["embedding"], m2["embedding"],
-        ]
-
-        meta_out = self.meta(preds, embeddings, regime)
-
-        return {
-            "prediction": meta_out["prediction"],
-            "sub_predictions": preds,
-            "attention_weights": meta_out["attention_weights"],
+        result = {
             "lstm_d": d1,
             "tft_d": d2,
             "lstm_m": m1,
             "tft_m": m2,
         }
 
+        # Optional news model
+        if self.use_news and self.news is not None and news_x is not None:
+            n1 = self.news(news_x)
+            pred_list.append(n1["prediction"])
+            emb_list.append(n1["embedding"])
+            result["news"] = n1
+
+        preds = torch.stack(pred_list, dim=-1)  # (batch, N)
+
+        meta_out = self.meta(preds, emb_list, regime)
+
+        result.update({
+            "prediction": meta_out["prediction"],
+            "sub_predictions": preds,
+            "attention_weights": meta_out["attention_weights"],
+        })
+
+        return result
+
     # ------------------------------------------------------------------
     # Save / Load
     # ------------------------------------------------------------------
     def save(self, path: str):
-        torch.save({
+        save_dict = {
             "cfg": self.cfg,
             "lstm_d": self.lstm_d.state_dict(),
             "tft_d": self.tft_d.state_dict(),
             "lstm_m": self.lstm_m.state_dict(),
             "tft_m": self.tft_m.state_dict(),
             "meta": self.meta.state_dict(),
-        }, path)
+        }
+        if self.use_news and self.news is not None:
+            save_dict["news"] = self.news.state_dict()
+        torch.save(save_dict, path)
         logger.info(f"HierarchicalForecaster saved → {path}")
 
     @classmethod
@@ -480,7 +534,9 @@ class HierarchicalForecaster(nn.Module):
         model.lstm_m.load_state_dict(ckpt["lstm_m"])
         model.tft_m.load_state_dict(ckpt["tft_m"])
         model.meta.load_state_dict(ckpt["meta"])
-        model.to(device)  # move buffers (LayerNorm, BatchNorm) as well as parameters
+        if "news" in ckpt and model.use_news and model.news is not None:
+            model.news.load_state_dict(ckpt["news"])
+        model.to(device)
         logger.info(f"HierarchicalForecaster loaded ← {path}")
         return model
 
@@ -493,30 +549,40 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     print("Testing HierarchicalForecaster...\n")
 
-    cfg = HierarchicalModelConfig()
+    # Test with news model enabled
+    cfg = HierarchicalModelConfig(use_news_model=True)
     model = HierarchicalForecaster(cfg)
 
     B = 4
     daily_x = torch.randn(B, cfg.daily_seq_len, cfg.daily_input_dim)
     minute_x = torch.randn(B, cfg.minute_seq_len, cfg.minute_input_dim)
     regime = torch.randn(B, cfg.regime_dim)
+    news_x = torch.randn(B, cfg.news_seq_len, cfg.news_input_dim)
 
-    out = model(daily_x, minute_x, regime)
+    out = model(daily_x, minute_x, regime, news_x=news_x)
 
     print(f"Meta prediction:   {out['prediction'].shape}")
     print(f"Sub predictions:   {out['sub_predictions'].shape}")
     print(f"Attention weights: {out['attention_weights']}")
     print(f"LSTM_D embedding:  {out['lstm_d']['embedding'].shape}")
     print(f"TFT_D embedding:   {out['tft_d']['embedding'].shape}")
+    print(f"News embedding:    {out['news']['embedding'].shape}")
 
     # Test save/load roundtrip
     import tempfile, os
     with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
         model.save(f.name)
         loaded = HierarchicalForecaster.load(f.name)
-        out2 = loaded(daily_x, minute_x, regime)
+        out2 = loaded(daily_x, minute_x, regime, news_x=news_x)
         diff = (out["prediction"] - out2["prediction"]).abs().max().item()
         print(f"\nSave/load roundtrip max diff: {diff:.2e}")
         os.unlink(f.name)
+
+    # Test without news model
+    cfg2 = HierarchicalModelConfig(use_news_model=False)
+    model2 = HierarchicalForecaster(cfg2)
+    out3 = model2(daily_x, minute_x, regime)
+    print(f"\nNo-news sub predictions: {out3['sub_predictions'].shape}")
+    print(f"No-news attention weights: {out3['attention_weights'].shape}")
 
     print("\n✅ HierarchicalForecaster test passed!")

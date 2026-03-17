@@ -11,6 +11,7 @@ stable-baselines3[extra]>=1.7.0
 
 # Deep learning
 torch>=1.10.0,<3.0.0
+transformers>=4.20.0  # For FinBERT news embeddings (ProsusAI/finbert)
 
 # Technical indicators
 ta>=0.10.2  # Technical Analysis library

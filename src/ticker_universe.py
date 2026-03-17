@@ -19,8 +19,6 @@ SECTORS = {
     "Financials": [
         # Banks
         "JPM", "BAC", "WFC", "C", "GS", "MS", "USB", "PNC", "TFC", "SCHW",
-        # Payment Networks
-        "V", "MA",
         # Insurance
         "BRK-B", "AIG", "MET", "PRU", "ALL", "TRV", "AFL",
         # Asset Management
@@ -70,7 +68,7 @@ SECTORS = {
         "PLD", "AMT", "EQIX", "CCI", "PSA", "SPG", "O", "WELL", "DLR", "AVB",
     ],
     "Communication_Services": [
-        "GOOG", "T", "VZ", "TMUS", "CHTR", "EA", "TTWO",
+        "GOOG", "T", "VZ", "TMUS", "CHTR", "EA", "TTWO", "ATVI",
     ],
 }
 
@@ -132,29 +130,10 @@ def get_liquid_large_caps(n: int = 30) -> List[str]:
 # Precomputed lists for convenience
 TICKERS_100 = get_all_tickers()
 TICKERS_50 = get_diversified_sample(50)
-TICKERS_80 = get_diversified_sample(80)
 TICKERS_30 = get_liquid_large_caps(30)
 
-# Held-out evaluation tickers — NEVER use these for training.
-# Spans diverse sectors to test generalization.
-EVAL_HOLDOUT = [
-    "V",       # Financials (payment network)
-    "MA",      # Financials (payment network)
-    "COST",    # Consumer Staples (retail)
-    "NKE",     # Consumer Discretionary (apparel)
-    "LLY",     # Healthcare (pharma)
-    "AVGO",    # Technology (semiconductors)
-    "UNP",     # Industrials (railroad)
-    "DIS",     # Communication/Entertainment
-    "NEM",     # Materials (gold mining)
-    "PSA",     # Real Estate (storage)
-]
-
-# Training-safe tickers (excludes eval holdout)
-TRAIN_TICKERS_90 = [t for t in TICKERS_100 if t not in set(EVAL_HOLDOUT)]
-
 # Default for training
-DEFAULT_TICKERS = TICKERS_80
+DEFAULT_TICKERS = TICKERS_50
 
 
 if __name__ == "__main__":
