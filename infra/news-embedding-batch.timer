@@ -1,0 +1,16 @@
+[Unit]
+Description=Weekly News FinBERT Batch Processing Timer
+Documentation=file:///home/joppe-kietselaer/Desktop/coding/tradingAgent/README.md
+Requires=news-embedding-batch.service
+
+[Timer]
+# Run every Sunday at 2:00 AM (off-peak, after weekly market close)
+OnCalendar=Sun *-*-* 02:00:00
+Persistent=true
+Unit=news-embedding-batch.service
+
+# Randomize start by up to 5 minutes to avoid thundering herd
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

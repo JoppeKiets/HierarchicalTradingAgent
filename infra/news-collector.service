@@ -1,0 +1,19 @@
+[Unit]
+Description=News Data Collector and Article Summarizer
+Documentation=file:///home/joppe-kietselaer/Desktop/coding/tradingAgent/README.md
+After=network.target
+# Note: FinBERT embedding is handled separately by news-embedding-batch.timer (weekly)
+
+[Service]
+Type=simple
+User=joppe-kietselaer
+WorkingDirectory=/home/joppe-kietselaer/Desktop/coding/tradingAgent
+Environment="PATH=/home/joppe-kietselaer/miniconda3/envs/trading311/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/bin/bash scripts/daily_news_pipeline.sh --all --continuous --interval 14400
+Restart=always
+RestartSec=60
+StandardOutput=append:/home/joppe-kietselaer/Desktop/coding/tradingAgent/logs/news_collector.log
+StandardError=append:/home/joppe-kietselaer/Desktop/coding/tradingAgent/logs/news_collector_error.log
+
+[Install]
+WantedBy=multi-user.target

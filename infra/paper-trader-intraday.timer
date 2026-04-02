@@ -1,0 +1,13 @@
+[Unit]
+Description=Paper Trader intraday stop/TP checker — runs every 15 minutes during market hours
+Requires=paper-trader-intraday.service
+
+[Timer]
+# Every 15 minutes, Mon–Fri, between 13:45–20:45 UTC (09:45–16:45 ET)
+OnCalendar=Mon..Fri *-*-* 13,14,15,16,17,18,19,20:00,15,30,45:00 UTC
+
+Persistent=false
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

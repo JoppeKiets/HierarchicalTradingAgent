@@ -1,0 +1,22 @@
+[Unit]
+Description=Paper Trader intraday — check stop/TP exits on open positions
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/joppe-kietselaer/Desktop/coding/tradingAgent
+Environment="PATH=/home/joppe-kietselaer/miniconda3/envs/trading311/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/joppe-kietselaer/miniconda3/envs/trading311/bin/python \
+          /home/joppe-kietselaer/Desktop/coding/tradingAgent/scripts/paper_trader.py \
+          --check-only
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=paper-trader-intraday
+
+TimeoutStartSec=120
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

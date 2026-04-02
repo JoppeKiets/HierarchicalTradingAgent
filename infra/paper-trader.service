@@ -1,0 +1,30 @@
+[Unit]
+Description=Paper Trading Agent — daily signal generation and position management
+Documentation=https://github.com/JoppeKiets/HierarchicalTradingAgent
+After=network-online.target ollama.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+# ── Edit these three lines to match your environment ───────────────────────
+WorkingDirectory=/home/joppe-kietselaer/Desktop/coding/tradingAgent
+Environment="PATH=/home/joppe-kietselaer/miniconda3/envs/trading311/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/joppe-kietselaer/miniconda3/envs/trading311/bin/python \
+          /home/joppe-kietselaer/Desktop/coding/tradingAgent/scripts/paper_trader.py \
+          --model models/hierarchical_v10/forecaster_final.pt \
+          --top-n 20
+
+# Keep stdout/stderr in the journal
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=paper-trader
+
+# Give the pipeline up to 20 minutes to complete
+TimeoutStartSec=1200
+
+# Restart policy: don't auto-restart a oneshot; the timer will re-trigger tomorrow
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

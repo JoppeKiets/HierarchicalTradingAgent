@@ -1,0 +1,18 @@
+[Unit]
+Description=News FinBERT Embedding Batch Processor
+After=network.target
+Documentation=file:///home/joppe-kietselaer/Desktop/coding/tradingAgent/README.md
+
+[Service]
+Type=oneshot
+User=joppe-kietselaer
+WorkingDirectory=/home/joppe-kietselaer/Desktop/coding/tradingAgent
+Environment="PATH=/home/joppe-kietselaer/miniconda3/envs/trading311/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/joppe-kietselaer/miniconda3/envs/trading311/bin/python scripts/preprocess_news_embeddings.py --batch-size 128 --device cuda --force
+StandardOutput=append:/home/joppe-kietselaer/Desktop/coding/tradingAgent/logs/news_embedding.log
+StandardError=append:/home/joppe-kietselaer/Desktop/coding/tradingAgent/logs/news_embedding_error.log
+TimeoutStartSec=14400
+TasksMax=1024
+
+[Install]
+WantedBy=multi-user.target

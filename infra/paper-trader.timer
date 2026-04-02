@@ -1,0 +1,22 @@
+[Unit]
+Description=Paper Trader daily timer — fires at 09:35 New York time on market days
+Requires=paper-trader.service
+
+[Timer]
+# 09:35 ET = 13:35 UTC (standard time) or 14:35 UTC (summer/EDT)
+# We use 14:35 UTC which covers EDT (summer).  During EST (winter) this fires
+# at 09:35 ET as well because OnCalendar is evaluated in UTC.
+# Adjust the hour to 13 if you want strict EST coverage instead.
+OnCalendar=Mon..Fri *-*-* 14:35:00 UTC
+
+# If the machine was off when the timer was supposed to fire, run as soon
+# as it comes back online (within a 2-hour window after the scheduled time)
+Persistent=true
+RandomizedDelaySec=60
+
+# Skip Saturday/Sunday is already handled by Mon..Fri above.
+# US market holidays are NOT automatically skipped — the pipeline will simply
+# fetch no new prices and log a warning, leaving the portfolio unchanged.
+
+[Install]
+WantedBy=timers.target
