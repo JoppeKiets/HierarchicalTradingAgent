@@ -13,19 +13,38 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Import sector/mcap constants from hierarchical ensemble
-try:
-    from src.hierarchical_ensemble import (
-        SECTORS, SECTOR_TO_ID, NUM_SECTORS,
-        MARKET_CAP_BUCKETS, MCAP_TO_ID, NUM_MCAP_BUCKETS,
-        get_market_cap_bucket
-    )
-except ImportError:
-    from hierarchical_ensemble import (
-        SECTORS, SECTOR_TO_ID, NUM_SECTORS,
-        MARKET_CAP_BUCKETS, MCAP_TO_ID, NUM_MCAP_BUCKETS,
-        get_market_cap_bucket
-    )
+# ============================================================================
+# Sector & market-cap constants (inlined — no external dependency)
+# ============================================================================
+
+SECTORS = [
+    "Technology", "Healthcare", "Financials", "Consumer Discretionary",
+    "Communication Services", "Industrials", "Consumer Staples",
+    "Energy", "Utilities", "Real Estate", "Materials", "Unknown",
+]
+SECTOR_TO_ID = {s: i for i, s in enumerate(SECTORS)}
+NUM_SECTORS = len(SECTORS)
+
+MARKET_CAP_BUCKETS = ["Mega", "Large", "Mid", "Small", "Micro", "Nano", "Unknown"]
+MCAP_TO_ID = {b: i for i, b in enumerate(MARKET_CAP_BUCKETS)}
+NUM_MCAP_BUCKETS = len(MARKET_CAP_BUCKETS)
+
+
+def get_market_cap_bucket(market_cap: float) -> str:
+    """Classify a market cap value into a named bucket."""
+    if market_cap >= 200e9:
+        return "Mega"
+    elif market_cap >= 10e9:
+        return "Large"
+    elif market_cap >= 2e9:
+        return "Mid"
+    elif market_cap >= 300e6:
+        return "Small"
+    elif market_cap >= 50e6:
+        return "Micro"
+    elif market_cap > 0:
+        return "Nano"
+    return "Unknown"
 
 # Cache file location
 CACHE_DIR = Path("data/metadata")

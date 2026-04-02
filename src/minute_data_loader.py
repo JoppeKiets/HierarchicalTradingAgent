@@ -9,6 +9,9 @@ from typing import Optional, Dict, List, Tuple
 import numpy as np
 import pandas as pd
 import yfinance as yf
+import socket
+from requests.exceptions import RequestException
+import time
 from ta.momentum import RSIIndicator
 from ta.trend import MACD, EMAIndicator, ADXIndicator
 from ta.volatility import BollingerBands, AverageTrueRange as ATRIndicator
@@ -53,46 +56,57 @@ class MinuteDataLoader:
         """
         logger.info(f"Fetching minute bars for {ticker}...")
         
-        try:
-            # Fetch using yfinance
-            data = yf.download(
-                ticker,
-                start=start_date,
-                end=end_date,
-                period=period if start_date is None else None,
-                interval="1m",
-                progress=False
-            )
-            
-            if data.empty:
-                logger.warning(f"No data fetched for {ticker}")
+        # Retry loop for transient network/DNS errors
+        data = pd.DataFrame()
+        for attempt in range(3):
+            try:
+                # Fetch using yfinance
+                data = yf.download(
+                    ticker,
+                    start=start_date,
+                    end=end_date,
+                    period=period if start_date is None else None,
+                    interval="1m",
+                    progress=False
+                )
+                break
+            except Exception as e:
+                err = str(e)
+                # Short retry for network/dns issues
+                if isinstance(e, (RequestException, socket.gaierror, OSError)) or "Could not resolve host" in err:
+                    backoff = 5 * (2 ** attempt)
+                    logger.warning(f"Transient network error fetching {ticker} (attempt {attempt+1}), sleeping {backoff}s: {err}")
+                    time.sleep(backoff)
+                    continue
+                logger.error(f"Error fetching data for {ticker}: {e}")
                 return pd.DataFrame()
-            
-            # Clean data
-            data = data.dropna()
-            
-            # Handle multi-level columns from newer yfinance versions
-            if isinstance(data.columns, pd.MultiIndex):
-                # Flatten: ('Close', 'AAPL') -> 'close'
-                data.columns = [c[0].lower() if isinstance(c, tuple) else c.lower() for c in data.columns]
-            else:
-                data.columns = [c.lower() for c in data.columns]
-            
-            # Ensure we have the required columns
-            required_cols = ['open', 'high', 'low', 'close', 'volume']
-            for col in required_cols:
-                if col not in data.columns:
-                    logger.warning(f"Missing column {col} for {ticker}")
-                    return pd.DataFrame()
-            
-            data = data[required_cols]
-            
-            logger.info(f"Fetched {len(data)} minute bars for {ticker}")
-            return data
-            
-        except Exception as e:
-            logger.error(f"Error fetching data for {ticker}: {e}")
+
+        # If no data (after retries) return empty
+        if data is None or data.empty:
+            logger.warning(f"No data fetched for {ticker}")
             return pd.DataFrame()
+
+        # Clean data
+        data = data.dropna()
+
+        # Handle multi-level columns from newer yfinance versions
+        if isinstance(data.columns, pd.MultiIndex):
+            # Flatten: ('Close', 'AAPL') -> 'close'
+            data.columns = [c[0].lower() if isinstance(c, tuple) else c.lower() for c in data.columns]
+        else:
+            data.columns = [c.lower() for c in data.columns]
+
+        # Ensure we have the required columns
+        required_cols = ['open', 'high', 'low', 'close', 'volume']
+        for col in required_cols:
+            if col not in data.columns:
+                logger.warning(f"Missing column {col} for {ticker}")
+                return pd.DataFrame()
+
+        data = data[required_cols]
+
+        logger.info(f"Fetched {len(data)} minute bars for {ticker}")
+        return data
     
     def reconstruct_minute_data(
         self,

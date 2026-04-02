@@ -56,6 +56,7 @@ from src.hierarchical_models import (
     HierarchicalForecaster,
     HierarchicalModelConfig,
 )
+from agents.feedback.attention_prior import AttentionPriorComputer
 
 logger = logging.getLogger(__name__)
 
@@ -410,6 +411,67 @@ def collect_test_predictions(
     return np.concatenate(preds_out), np.array(aligned_tgts), np.array(aligned_dates)
 
 
+@torch.no_grad()
+def collect_sub_model_predictions(
+    forecaster: HierarchicalForecaster,
+    daily_loader, minute_loader,
+    device: torch.device,
+) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
+    """Collect per-sub-model prediction arrays for attention prior computation.
+
+    Returns:
+        sub_preds:  {model_name: (N,) array of scalar predictions}
+        targets:    (N,) array of actual returns
+    """
+    forecaster.eval()
+    E = forecaster.cfg.embedding_dim
+
+    # Collect daily model outputs keyed by (ticker, ord_date)
+    daily_results: Dict[Tuple, Dict] = {}
+    for batch in daily_loader:
+        x, y, ordinal_dates, tickers_batch = batch
+        x = x.to(device)
+        d1 = forecaster.lstm_d(x)
+        d2 = forecaster.tft_d(x)
+        for i in range(len(y)):
+            key = (tickers_batch[i], int(ordinal_dates[i]))
+            daily_results[key] = {
+                "lstm_d": float(d1["prediction"][i].cpu()),
+                "tft_d": float(d2["prediction"][i].cpu()),
+                "target": float(y[i]),
+            }
+
+    # Collect minute model outputs
+    minute_results: Dict[Tuple, Dict] = {}
+    for batch in minute_loader:
+        x, y, ordinal_dates, tickers_batch = batch
+        x = x.to(device)
+        m1 = forecaster.lstm_m(x)
+        m2 = forecaster.tft_m(x)
+        for i in range(len(y)):
+            key = (tickers_batch[i], int(ordinal_dates[i]))
+            minute_results[key] = {
+                "lstm_m": float(m1["prediction"][i].cpu()),
+                "tft_m": float(m2["prediction"][i].cpu()),
+            }
+
+    # Align: iterate daily keys, fill minute with 0 if missing
+    sub_names = ["lstm_d", "tft_d", "lstm_m", "tft_m"]
+    per_model: Dict[str, list] = {n: [] for n in sub_names}
+    targets: list = []
+
+    for key, dd in daily_results.items():
+        md = minute_results.get(key, {})
+        per_model["lstm_d"].append(dd["lstm_d"])
+        per_model["tft_d"].append(dd["tft_d"])
+        per_model["lstm_m"].append(md.get("lstm_m", 0.0))
+        per_model["tft_m"].append(md.get("tft_m", 0.0))
+        targets.append(dd["target"])
+
+    sub_preds = {name: np.array(vals) for name, vals in per_model.items()}
+    return sub_preds, np.array(targets)
+
+
 # ============================================================================
 # Long-short backtest (same as evaluate_hierarchical.py)
 # ============================================================================
@@ -487,6 +549,13 @@ def run_walk_forward(
         TrainConfig, SubModelTrainer, MetaTrainer, JointFineTuner
     )
 
+    # Attention prior: accumulates bias across windows
+    prior_dir = os.path.join(output_dir, "attention_prior")
+    attention_prior = AttentionPriorComputer(
+        prior_dir=prior_dir,
+        sub_model_names=["lstm_d", "tft_d", "lstm_m", "tft_m"],
+    )
+
     all_window_results = []
 
     for w_idx, window in enumerate(windows):
@@ -527,6 +596,12 @@ def run_walk_forward(
             minute_input_dim=loaders["minute_n_features"],
         )
         forecaster = HierarchicalForecaster(model_cfg).to(device)
+
+        # Apply attention bias from previous window (warm-start the attention prior)
+        bias_tensor = attention_prior.get_bias_tensor()
+        if bias_tensor is not None and w_idx > 0:
+            logger.info(f"  Applying attention bias from window {w_idx - 1}")
+            forecaster.meta.apply_attention_bias(bias_tensor.to(device))
 
         tcfg = TrainConfig(
             output_dir=os.path.join(output_dir, f"window_{w_idx}"),
@@ -621,6 +696,31 @@ def run_walk_forward(
 
         # Save per-window checkpoint
         forecaster.save(os.path.join(tcfg.output_dir, "forecaster.pt"))
+
+        # ── Compute attention prior for next window ──────────────────
+        #    Collect per-sub-model predictions on the test set and
+        #    compute IC per model.  This feeds the attention bias for
+        #    the next window's MetaMLP initialization.
+        logger.info(f"  Computing attention prior from window {w_idx} test set...")
+        try:
+            sub_preds, sub_targets = collect_sub_model_predictions(
+                forecaster,
+                loaders["daily"]["test"], loaders["minute"]["test"],
+                device,
+            )
+            if len(sub_targets) >= 5:
+                sub_metrics = attention_prior.compute_from_predictions(
+                    sub_preds, sub_targets,
+                )
+                attention_prior.compute_bias(
+                    sub_model_metrics=sub_metrics,
+                    window_idx=w_idx,
+                )
+                logger.info(f"  Attention prior updated for next window")
+            else:
+                logger.info(f"  Too few test samples for attention prior ({len(sub_targets)})")
+        except Exception as e:
+            logger.warning(f"  Attention prior computation failed: {e}")
 
     # ─── Aggregate results ────────────────────────────────────────────
     if not all_window_results:

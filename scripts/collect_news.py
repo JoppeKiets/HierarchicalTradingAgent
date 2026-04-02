@@ -23,6 +23,8 @@ from typing import List, Dict, Optional, Tuple
 
 import pandas as pd
 import requests
+import socket
+from requests.exceptions import RequestException
 import yfinance as yf
 from bs4 import BeautifulSoup
 
@@ -40,25 +42,36 @@ HEADERS = {
 
 def fetch_full_text(url: str) -> Optional[str]:
     """Extremely basic full-text scraper for Yahoo and common publishers."""
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, "html.parser")
-        
-        # Yahoo Finance specific text
-        if "finance.yahoo.com" in url:
-            article = soup.find("article")
-            if article:
-                paragraphs = article.find_all("p")
-                return " ".join([p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)])
-        
-        # Generic fallback: longest div with many paragraphs
-        paragraphs = soup.find_all("p")
-        text = " ".join([p.get_text(strip=True) for p in paragraphs if len(p.get_text(strip=True)) > 40])
-        return text if len(text) > 100 else None
-    except Exception as e:
-        logger.debug(f"Failed to fetch text from {url}: {e}")
+    soup = None
+    for attempt in range(2):
+        try:
+            response = requests.get(url, headers=HEADERS, timeout=10)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            break
+        except RequestException as e:
+            if attempt == 0:
+                time.sleep(1.0)
+                continue
+            logger.debug(f"Failed to fetch text from {url}: {e}")
+            return None
+
+    if soup is None:
         return None
+
+    # Yahoo Finance specific text
+    if "finance.yahoo.com" in url:
+        article = soup.find("article")
+        if article:
+            paragraphs = article.find_all("p")
+            text = " ".join([p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)])
+            if text:
+                return text
+
+    # Generic fallback: longest div with many paragraphs
+    paragraphs = soup.find_all("p")
+    text = " ".join([p.get_text(strip=True) for p in paragraphs if len(p.get_text(strip=True)) > 40])
+    return text if len(text) > 100 else None
 
 _RATE_LIMIT_BACKOFF: float = 0.0  # module-level shared back-off seconds
 
@@ -98,45 +111,86 @@ def collect_ticker_news(ticker: str, data_dir: str = "data/organized",
     else:
         time.sleep(per_ticker_delay)
 
-    # Fetch from yfinance — retry once after a back-off on rate-limit errors
+    # Fetch from yfinance — handle rate-limits and transient network/DNS errors
     yf_news = []
-    for attempt in range(3):
+    for attempt in range(5):
         try:
             yf_ticker = yf.Ticker(ticker)
             yf_news = yf_ticker.news or []
             break  # success
         except Exception as e:
             err = str(e)
-            if "Too Many Requests" in err or "Rate limit" in err.lower() or "429" in err:
-                backoff = 60 * (2 ** attempt)  # 60s, 120s, 240s
-                logger.warning(f"[{ticker}] Rate limited (attempt {attempt+1}), "
-                               f"sleeping {backoff}s ...")
+            # Rate-limit detection (yfinance may raise an error containing 429/Too Many Requests)
+            if "429" in err or "Too Many Requests" in err or "rate limit" in err.lower():
+                backoff = 60 * (2 ** attempt)  # 60s, 120s, 240s, ...
+                logger.warning(f"[{ticker}] Rate limited (attempt {attempt+1}), sleeping {backoff}s ...")
+                # set a global backoff so subsequent tickers pause briefly
+                _RATE_LIMIT_BACKOFF = backoff
                 time.sleep(backoff)
-                _RATE_LIMIT_BACKOFF = 0.0  # already waited here
-            else:
-                logger.error(f"Error calling yfinance for {ticker}: {e}")
-                return 0
+                continue
+
+            # Network/DNS/transient errors — retry with short exponential backoff
+            if isinstance(e, (RequestException, socket.gaierror, OSError)) or "Could not resolve host" in err:
+                backoff = 5 * (2 ** attempt)  # 5s, 10s, 20s, ...
+                logger.warning(f"[{ticker}] Network error (attempt {attempt+1}), sleeping {backoff}s: {err}")
+                time.sleep(backoff)
+                continue
+
+            # Non-retryable error — log and skip this ticker
+            logger.error(f"Error calling yfinance for {ticker}: {e}")
+            return 0
     else:
-        logger.error(f"[{ticker}] Gave up after 3 rate-limit retries")
+        logger.error(f"[{ticker}] Gave up after {attempt+1} retries")
         return 0
 
     new_articles = []
     for item in yf_news:
-        url = item.get("link")
+        # ---- Extract fields from old OR new yfinance format ----
+        content = item.get("content") or {}
+
+        # URL: new format nests under content.canonicalUrl.url or content.clickThroughUrl.url
+        url = (
+            item.get("link")
+            or (content.get("canonicalUrl") or {}).get("url")
+            or (content.get("clickThroughUrl") or {}).get("url")
+        )
         if not url or url in existing_urls:
             continue
-            
-        # Basic fields
-        title = item.get("title")
-        publisher = item.get("publisher")
+
+        # Title
+        title = item.get("title") or content.get("title")
+
+        # Publisher
+        publisher = item.get("publisher") or (content.get("provider") or {}).get("displayName")
+
+        # Date: old format uses Unix timestamp, new format uses ISO string
         ts = item.get("providerPublishTime")
-        dt_str = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S") if ts else None
-        
-        # Full text fetch (take a breath between requests)
+        pub_date_str = content.get("pubDate")  # e.g. "2026-03-23T11:01:59Z"
+        if ts:
+            dt_str = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        elif pub_date_str:
+            try:
+                dt_str = datetime.fromisoformat(pub_date_str.replace("Z", "+00:00")).strftime("%Y-%m-%d %H:%M:%S")
+            except (ValueError, AttributeError):
+                dt_str = pub_date_str
+        else:
+            dt_str = None
+
+        # ---- Get article text ----
+        # 1) Try full-text scrape from the URL
         text = fetch_full_text(url)
-        time.sleep(0.5) 
-        
-        if text:
+        time.sleep(0.5)
+
+        # 2) Fallback: use yfinance-provided description (strip HTML) or summary
+        if not text:
+            raw_desc = content.get("description", "")
+            if raw_desc:
+                text = BeautifulSoup(raw_desc, "html.parser").get_text(strip=True)
+            if not text or len(text) < 80:
+                text = content.get("summary", "") or text
+
+        # Only store if we got meaningful text
+        if text and len(text) >= 50:
             new_articles.append({
                 "Date": dt_str,
                 "Article_title": title,
@@ -156,8 +210,8 @@ def collect_ticker_news(ticker: str, data_dir: str = "data/organized",
         df_new = pd.DataFrame(new_articles)
         if news_file.exists():
             df_final = pd.concat([pd.read_csv(news_file), df_new], ignore_index=True)
-            # Sort by date
-            df_final["Date"] = pd.to_datetime(df_final["Date"])
+            # Sort by date — use mixed format parsing to handle old ("... UTC") and new formats
+            df_final["Date"] = pd.to_datetime(df_final["Date"], format="mixed", utc=True, errors="coerce")
             df_final = df_final.sort_values("Date", ascending=False).drop_duplicates(subset=["Url"])
             df_final.to_csv(news_file, index=False)
         else:

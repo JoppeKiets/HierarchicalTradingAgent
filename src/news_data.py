@@ -167,7 +167,7 @@ def _normalize_news_features(features: np.ndarray, cfg: NewsDataConfig) -> np.nd
         std = s.rolling(cfg.norm_window, min_periods=2).std().fillna(1.0).clip(lower=1e-8)
         normalized = ((s - mu) / std).clip(-5, 5).fillna(0).values
         # Only apply normalization to days with news
-        out[:, j] = np.where(has_news, normalized, 0.0)
+        out[:, j] = np.where(has_news, normalized.astype(np.float32), 0.0)
 
     return out.astype(np.float32)
 
@@ -292,7 +292,7 @@ def create_news_dataloaders(
     news_cfg: NewsDataConfig,
     daily_cache_dir: str = "data/feature_cache/daily",
     batch_size: int = 32,
-    num_workers: int = 0,
+    num_workers: int = 8,
 ) -> Dict:
     """Create news DataLoaders for all splits.
 
@@ -305,6 +305,7 @@ def create_news_dataloaders(
         }
     """
     result = {}
+    use_persistent = num_workers > 0
 
     for split_name in ["train", "val", "test"]:
         tickers = splits[split_name]
@@ -323,6 +324,8 @@ def create_news_dataloaders(
             num_workers=num_workers,
             pin_memory=True,
             drop_last=shuffle if len(ds) > 0 else False,
+            persistent_workers=use_persistent,
+            prefetch_factor=3 if num_workers > 0 else None,
         )
 
     result["n_features"] = news_cfg.total_dim

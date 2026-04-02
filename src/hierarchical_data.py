@@ -54,8 +54,8 @@ class HierarchicalDataConfig:
     daily_seq_len: int = 720
     minute_seq_len: int = 780      # ~2 trading days (down from 1170)
 
-    # Stride controls dataset size
-    daily_stride: int = 5
+    # Stride controls dataset size (stride=20: ~99% overlap at seq=720 still)
+    daily_stride: int = 20
     minute_stride: int = 30        # smaller stride → more minute sequences
 
     # Target
@@ -213,6 +213,23 @@ def _compute_daily_features(
             compute_calendar_features(df),
         ]
         features = pd.concat(parts, axis=1)
+
+    # Optional auto-generated features promoted by the Analyst loop.
+    # This module is maintained by agents.feedback.auto_feature_engineer.
+    try:
+        from src.features.generated_features import compute_generated_features
+
+        generated = compute_generated_features(features)
+        if generated is not None and len(generated.columns) > 0:
+            features = pd.concat([features, generated], axis=1)
+            logger.info(
+                "Added %d generated features: %s",
+                len(generated.columns),
+                list(generated.columns),
+            )
+    except Exception as e:
+        logger.warning("Skipping generated features due to error: %s", e)
+
     features = features.replace([np.inf, -np.inf], np.nan).fillna(0)
     return features.values.astype(np.float32), list(features.columns)
 
@@ -719,12 +736,48 @@ def preprocess_minute_ticker(
 
     feat_arr, names = _compute_minute_features(mdf)
 
-    # Add lagged daily news features and broadcast by minute date
-    minute_dates = pd.to_datetime(mdf["timestamp"], utc=True).dt.tz_convert(None)
-    news_arr, news_names = _build_lagged_news_features(ticker, cfg, minute_dates)
-    if news_arr.shape[0] == feat_arr.shape[0]:
-        feat_arr = np.concatenate([feat_arr, news_arr], axis=1)
-        names = names + news_names
+    # ------------------------------------------------------------------
+    # Append 774-dim per-article news features (intraday-aligned)
+    # ------------------------------------------------------------------
+    # Produced by scripts/align_news_to_minute.py from the per-article
+    # FinBERT cache at data/feature_cache/news_articles/.
+    # Layout: [0:768] mean-pooled embedding, [768:774] sentiment summary
+    # (pos_mean, neg_mean, neu_mean, compound_mean, compound_std, count).
+    # Falls back to zeros if the cache hasn't been built yet.
+    NEWS_DIM = 774
+    minute_news_dir = Path(cfg.cache_dir) / "minute_news"
+    news_feat_path  = minute_news_dir / f"{ticker}_news_features.npy"
+    news_ts_path    = minute_news_dir / f"{ticker}_news_timestamps.npy"
+
+    n_bars = len(mdf)
+    if news_feat_path.exists() and news_ts_path.exists():
+        cached_news = np.load(news_feat_path)          # (M, 774)
+        cached_ts   = np.load(news_ts_path)            # (M,) unix sec
+
+        if cached_news.shape[0] == n_bars:
+            # Perfect length match — use directly
+            news_arr = cached_news.astype(np.float32)
+        else:
+            # Align by timestamp via binary-search (handles row-count mismatch)
+            bar_ts = (
+                pd.to_datetime(mdf["timestamp"], utc=True).astype("int64") // 10**9
+            ).values
+            news_arr = np.zeros((n_bars, NEWS_DIM), dtype=np.float32)
+            for i, bt in enumerate(bar_ts):
+                idx = int(np.searchsorted(cached_ts, bt, side="right")) - 1
+                if 0 <= idx < len(cached_news):
+                    news_arr[i] = cached_news[idx]
+    else:
+        logger.debug(
+            f"  {ticker}: minute_news cache missing — zero-filling {NEWS_DIM} dims. "
+            f"Run scripts/align_news_to_minute.py to build it."
+        )
+        news_arr = np.zeros((n_bars, NEWS_DIM), dtype=np.float32)
+
+    news_names = [f"news_{i}" for i in range(NEWS_DIM)]
+    feat_arr   = np.concatenate([feat_arr, news_arr], axis=1)
+    names      = names + news_names
+
     if cfg.minute_normalize:
         feat_arr = _normalize_array(feat_arr, cfg.minute_norm_window)
 
@@ -998,11 +1051,17 @@ class LazyMinuteDataset(Dataset):
         seq = feat[row - self.cfg.minute_seq_len : row].copy()
         target = float(tgt[row - 1])
 
-        # Load ordinal date for regime lookup / meta alignment
+        # Load ordinal date for regime lookup / meta alignment.
+        # Use dates[row] — the TARGET bar's date — so this key matches the
+        # daily dataset which also keys by the target bar's date (dates[row]).
+        # The minute forecast_horizon is ~390 bars (1 trading day), so
+        # dates[row-1] is 1 day behind the daily key; dates[row] aligns them.
         date_path = self.cache / f"{ticker}_dates.npy"
         if date_path.exists():
             dates = np.load(date_path, mmap_mode="r")
-            ordinal_date = int(dates[row - 1])
+            # Clamp to valid range: row may equal len(dates)-1 when near end
+            date_idx = min(row, len(dates) - 1)
+            ordinal_date = int(dates[date_idx])
         else:
             ordinal_date = 0
 
@@ -1023,9 +1082,15 @@ def create_dataloaders(
     cfg: HierarchicalDataConfig,
     batch_size_daily: int = 256,
     batch_size_minute: int = 128,
-    num_workers: int = 4,
+    num_workers: int = 8,
 ) -> Dict:
     """Create lazy DataLoaders for all splits.
+
+    Performance notes (RTX 5080 + Ryzen 9 7900X):
+      - num_workers=8: saturates I/O pipeline without over-subscribing CPU
+      - pin_memory=True: enables async CPU→GPU DMA transfers
+      - persistent_workers=True: avoids respawning workers every epoch
+      - prefetch_factor=3: keeps 3 batches ready per worker in the queue
 
     Returns:
         {
@@ -1036,6 +1101,7 @@ def create_dataloaders(
         }
     """
     result = {"daily": {}, "minute": {}}
+    use_persistent = num_workers > 0
 
     for split_name in ["train", "val", "test"]:
         tickers = splits[split_name]
@@ -1051,6 +1117,8 @@ def create_dataloaders(
             num_workers=num_workers,
             pin_memory=True,
             drop_last=shuffle if len(daily_ds) > 0 else False,
+            persistent_workers=use_persistent,
+            prefetch_factor=3 if num_workers > 0 else None,
         )
         result["minute"][split_name] = DataLoader(
             minute_ds,
@@ -1059,9 +1127,535 @@ def create_dataloaders(
             num_workers=num_workers,
             pin_memory=True,
             drop_last=shuffle if len(minute_ds) > 0 else False,
+            persistent_workers=use_persistent,
+            prefetch_factor=3 if num_workers > 0 else None,
         )
 
     result["daily_n_features"] = result["daily"]["train"].dataset.n_features
     result["minute_n_features"] = result["minute"]["train"].dataset.n_features
 
+    return result
+
+
+# ============================================================================
+# Fundamental data: preprocessing + lazy dataset + dataloaders
+# ============================================================================
+
+def preprocess_fundamental_ticker(
+    ticker: str,
+    cfg: HierarchicalDataConfig,
+    force: bool = False,
+) -> Optional[Dict]:
+    """Compute fundamental features for one ticker and save to cache.
+
+    Uses the quarterly-financial pipeline from ``fundamental_features.py``
+    to produce a (T, 14) array of daily-aligned fundamental ratios (forward-
+    filled from quarterly reports).  Targets and dates are reused from the
+    daily cache (must run ``preprocess_daily_ticker`` first).
+
+    Saves:
+        {cache_dir}/fundamental/{ticker}_features.npy   (T, F_fund)
+    """
+    cache = Path(cfg.cache_dir) / "fundamental"
+    cache.mkdir(parents=True, exist_ok=True)
+
+    feat_path = cache / f"{ticker}_features.npy"
+    if not force and feat_path.exists():
+        feat = np.load(feat_path, mmap_mode="r")
+        return {"ticker": ticker, "n_rows": feat.shape[0], "n_features": feat.shape[1]}
+
+    # Need daily price data and pre-existing daily cache (for targets/dates)
+    daily_cache = Path(cfg.cache_dir) / "daily"
+    daily_tgt_path = daily_cache / f"{ticker}_targets.npy"
+    daily_date_path = daily_cache / f"{ticker}_dates.npy"
+    if not daily_tgt_path.exists() or not daily_date_path.exists():
+        return None
+
+    price_file = Path(cfg.organized_dir) / ticker / "price_history.csv"
+    if not price_file.exists():
+        return None
+
+    try:
+        prices_df = pd.read_csv(price_file)
+        prices_df.columns = [c.strip().lower() for c in prices_df.columns]
+        if "date" in prices_df.columns:
+            prices_df["date"] = pd.to_datetime(prices_df["date"], errors="coerce")
+            prices_df = prices_df.sort_values("date").reset_index(drop=True)
+    except Exception as e:
+        logger.warning(f"  {ticker}: read failed — {e}")
+        return None
+
+    try:
+        from src.features.fundamental_features import compute_fundamental_features
+        fund_df = compute_fundamental_features(ticker, prices_df)
+    except Exception as e:
+        logger.warning(f"  {ticker}: fundamental feature computation failed — {e}")
+        return None
+
+    if fund_df.empty:
+        return None
+
+    # Convert to numpy — columns are "fund_trailing_pe", etc.
+    feat_arr = fund_df.values.astype(np.float32)
+
+    # Validate length matches daily cache
+    daily_tgt = np.load(daily_tgt_path, mmap_mode="r")
+    if feat_arr.shape[0] != daily_tgt.shape[0]:
+        logger.warning(
+            f"  {ticker}: fundamental rows ({feat_arr.shape[0]}) != "
+            f"daily rows ({daily_tgt.shape[0]}) — skipping"
+        )
+        return None
+
+    np.save(feat_path, feat_arr)
+
+    return {
+        "ticker": ticker,
+        "n_rows": feat_arr.shape[0],
+        "n_features": feat_arr.shape[1],
+        "feature_names": list(fund_df.columns),
+    }
+
+
+def preprocess_all_fundamentals(
+    tickers: List[str],
+    cfg: HierarchicalDataConfig,
+    force: bool = False,
+) -> Dict[str, Dict]:
+    """Preprocess fundamental features for all tickers."""
+    meta: Dict[str, Dict] = {}
+    t0 = time.time()
+    logger.info(
+        f"Preprocessing fundamental features for {len(tickers)} tickers..."
+        + (" (force)" if force else "")
+    )
+    for i, ticker in enumerate(tickers):
+        info = preprocess_fundamental_ticker(ticker, cfg, force=force)
+        if info:
+            meta[ticker] = info
+        if (i + 1) % 50 == 0:
+            logger.info(f"  Fundamental: {i+1}/{len(tickers)} done ({len(meta)} ok)")
+
+    logger.info(
+        f"  Fundamental: {len(meta)} tickers cached in {time.time()-t0:.0f}s"
+    )
+    return meta
+
+
+class LazyFundamentalDataset(Dataset):
+    """Lazy-loading dataset for fundamental (tabular) features.
+
+    Each item returns a **flat feature vector** (not a sequence) representing
+    the latest-known fundamental ratios as of that date.  Targets and dates
+    are reused from the daily cache.
+
+    Returns: (fund_features_vec, target, ordinal_date, ticker)
+        fund_features_vec: (F_fund,) — e.g. 14 fundamental ratios
+    """
+
+    def __init__(
+        self,
+        tickers: List[str],
+        cfg: HierarchicalDataConfig,
+        split_name: str = "train",
+    ):
+        self.cfg = cfg
+        self.fund_cache = Path(cfg.cache_dir) / "fundamental"
+        self.daily_cache = Path(cfg.cache_dir) / "daily"
+        self.split_name = split_name
+
+        self.index: List[Tuple[str, int]] = []
+        self.n_features = 0
+
+        warmup = max(cfg.daily_seq_len, cfg.daily_norm_window, 60)
+
+        for ticker in tickers:
+            fund_path = self.fund_cache / f"{ticker}_features.npy"
+            tgt_path = self.daily_cache / f"{ticker}_targets.npy"
+            date_path = self.daily_cache / f"{ticker}_dates.npy"
+
+            if not fund_path.exists() or not tgt_path.exists():
+                continue
+
+            fund = np.load(fund_path, mmap_mode="r")
+            tgt = np.load(tgt_path, mmap_mode="r")
+            n_rows, n_feat = fund.shape
+            self.n_features = n_feat
+
+            end = n_rows - cfg.forecast_horizon
+
+            # Temporal boundaries (same as daily — same targets/dates)
+            lo, hi = self._temporal_bounds(warmup, end, cfg)
+
+            for i in range(lo, hi, cfg.daily_stride):
+                if not np.isnan(tgt[i]):
+                    self.index.append((ticker, i))
+
+        logger.info(
+            f"LazyFundamentalDataset[{split_name}]: {len(self.index):,} samples "
+            f"from {len(tickers)} tickers, {self.n_features} features"
+        )
+
+    def _temporal_bounds(self, warmup: int, end: int, cfg) -> Tuple[int, int]:
+        """Return (lo, hi) row indices for the requested temporal split."""
+        if cfg.split_mode != "temporal":
+            return warmup, end
+
+        usable = end - warmup
+        if usable <= 0:
+            return warmup, warmup
+
+        train_end = warmup + int(usable * cfg.temporal_train_frac)
+        val_end = train_end + int(usable * cfg.temporal_val_frac)
+
+        if self.split_name == "train":
+            return warmup, train_end
+        elif self.split_name == "val":
+            return train_end, val_end
+        else:
+            return val_end, end
+
+    def __len__(self) -> int:
+        return len(self.index)
+
+    def __getitem__(self, idx: int):
+        ticker, row = self.index[idx]
+
+        fund = np.load(
+            self.fund_cache / f"{ticker}_features.npy", mmap_mode="r"
+        )
+        tgt = np.load(
+            self.daily_cache / f"{ticker}_targets.npy", mmap_mode="r"
+        )
+
+        features_vec = fund[row].copy()  # (F_fund,)
+        target = float(tgt[row])
+
+        date_path = self.daily_cache / f"{ticker}_dates.npy"
+        if date_path.exists():
+            dates = np.load(date_path, mmap_mode="r")
+            ordinal_date = int(dates[row])
+        else:
+            ordinal_date = 0
+
+        return (
+            torch.from_numpy(features_vec),
+            torch.tensor(target, dtype=torch.float32),
+            ordinal_date,
+            ticker,
+        )
+
+
+def create_fundamental_dataloaders(
+    splits: Dict[str, List[str]],
+    cfg: HierarchicalDataConfig,
+    batch_size: int = 256,
+    num_workers: int = 8,
+) -> Dict:
+    """Create DataLoaders for fundamental features (all splits).
+
+    Returns:
+        {
+            'train': DataLoader, 'val': DataLoader, 'test': DataLoader,
+            'n_features': int,
+        }
+    """
+    result: Dict = {}
+    use_persistent = num_workers > 0
+    for split_name in ["train", "val", "test"]:
+        tickers = splits[split_name]
+        shuffle = split_name == "train"
+        ds = LazyFundamentalDataset(tickers, cfg, split_name=split_name)
+        result[split_name] = DataLoader(
+            ds,
+            batch_size=batch_size,
+            shuffle=shuffle if len(ds) > 0 else False,
+            num_workers=num_workers,
+            pin_memory=True,
+            drop_last=shuffle if len(ds) > 0 else False,
+            persistent_workers=use_persistent,
+            prefetch_factor=3 if num_workers > 0 else None,
+        )
+    result["n_features"] = result["train"].dataset.n_features
+    return result
+
+
+# ============================================================================
+# Graph data: cross-sectional dataset for GNN
+# ============================================================================
+
+def _load_sector_map(
+    tickers: List[str],
+    cache_dir: str = "data/metadata",
+) -> Dict[str, str]:
+    """Load ticker → sector mapping from metadata cache or yfinance.
+
+    Tries the JSON cache first; falls back to yfinance for unknowns.
+    """
+    cache_path = Path(cache_dir) / "ticker_metadata.json"
+    cached: Dict = {}
+    if cache_path.exists():
+        try:
+            with open(cache_path) as f:
+                cached = json.load(f)
+        except Exception:
+            pass
+
+    sector_map: Dict[str, str] = {}
+    unknown_tickers: List[str] = []
+
+    for t in tickers:
+        if t in cached and "sector" in cached[t]:
+            sector_map[t] = cached[t]["sector"]
+        else:
+            unknown_tickers.append(t)
+
+    # Batch-fetch unknowns from yfinance (with caching)
+    if unknown_tickers:
+        logger.info(f"Fetching sector info for {len(unknown_tickers)} tickers from yfinance...")
+        for t in unknown_tickers:
+            try:
+                import yfinance as yf
+                info = yf.Ticker(t).info or {}
+                raw = info.get("sector", "Unknown")
+                sector_map[t] = raw if raw else "Unknown"
+                # Update cache
+                if t not in cached:
+                    cached[t] = {}
+                cached[t]["sector"] = sector_map[t]
+                cached[t]["industry"] = info.get("industry", "Unknown")
+            except Exception:
+                sector_map[t] = "Unknown"
+
+        # Persist cache
+        Path(cache_dir).mkdir(parents=True, exist_ok=True)
+        try:
+            with open(cache_path, "w") as f:
+                json.dump(cached, f, indent=2)
+        except Exception:
+            pass
+
+    return sector_map
+
+
+def build_adjacency(
+    tickers: List[str],
+    sector_map: Dict[str, str],
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Build a sparse graph where stocks in the same sector are connected.
+
+    Returns:
+        edge_index:  (2, E) long tensor — COO format
+        edge_weight: (E,) float tensor  — 1.0 for same-sector edges
+    """
+    sector_groups: Dict[str, List[int]] = {}
+    for i, t in enumerate(tickers):
+        sec = sector_map.get(t, "Unknown")
+        sector_groups.setdefault(sec, []).append(i)
+
+    src_list, dst_list = [], []
+    for sec, members in sector_groups.items():
+        if sec == "Unknown" or len(members) < 2:
+            continue
+        # Fully-connect members within sector (undirected)
+        for a in members:
+            for b in members:
+                if a != b:
+                    src_list.append(a)
+                    dst_list.append(b)
+
+    # Also add self-loops for every node
+    for i in range(len(tickers)):
+        src_list.append(i)
+        dst_list.append(i)
+
+    edge_index = torch.tensor([src_list, dst_list], dtype=torch.long)
+    edge_weight = torch.ones(edge_index.shape[1], dtype=torch.float32)
+    return edge_index, edge_weight
+
+
+class CrossSectionalGraphDataset(Dataset):
+    """Dataset that produces one *cross-sectional snapshot* per trading date.
+
+    Each sample is a date ``d`` for which we have daily features for ≥2
+    tickers.  The __getitem__ returns all tickers' features for that date
+    as a batch, plus the sector-based adjacency graph.
+
+    Returns a dict:
+        node_features: (N_tickers, F) — daily features at date d
+        targets:       (N_tickers,)   — next-day returns
+        ordinal_date:  int
+        tickers:       list[str]
+        edge_index:    (2, E) long tensor
+        edge_weight:   (E,) float tensor
+        mask:          (N_tickers,) bool — True if ticker has data on this date
+    """
+
+    def __init__(
+        self,
+        tickers: List[str],
+        cfg: HierarchicalDataConfig,
+        split_name: str = "train",
+        min_tickers_per_date: int = 10,
+    ):
+        self.cfg = cfg
+        self.cache = Path(cfg.cache_dir) / "daily"
+        self.split_name = split_name
+
+        # Load sector map and build graph
+        self.tickers = sorted(tickers)
+        self.ticker_to_idx = {t: i for i, t in enumerate(self.tickers)}
+        sector_map = _load_sector_map(self.tickers)
+        self.edge_index, self.edge_weight = build_adjacency(self.tickers, sector_map)
+        n_edges = self.edge_index.shape[1] if self.edge_index.numel() > 0 else 0
+        n_sector_edges = n_edges - len(self.tickers)  # subtract self-loops
+        if n_sector_edges <= 0:
+            logger.warning(
+                f"CrossSectionalGraphDataset[{split_name}]: 0 sector edges built "
+                f"(all tickers mapped to 'Unknown' sector or sector_map empty). "
+                f"GNN will only use self-loops — training will be ineffective. "
+                f"Check data/metadata/ticker_metadata.json for sector coverage."
+            )
+        else:
+            logger.info(
+                f"CrossSectionalGraphDataset[{split_name}]: "
+                f"{n_sector_edges} sector edges + {len(self.tickers)} self-loops"
+            )
+        self.n_features = 0
+
+        # Build date → {ticker: row_idx} mapping
+        warmup = max(cfg.daily_seq_len, cfg.daily_norm_window, 60)
+
+        # date_data[ordinal_date] = {ticker: row_idx}
+        date_data: Dict[int, Dict[str, int]] = {}
+
+        for ticker in self.tickers:
+            feat_path = self.cache / f"{ticker}_features.npy"
+            tgt_path = self.cache / f"{ticker}_targets.npy"
+            date_path = self.cache / f"{ticker}_dates.npy"
+            if not feat_path.exists() or not tgt_path.exists() or not date_path.exists():
+                continue
+
+            feat = np.load(feat_path, mmap_mode="r")
+            tgt = np.load(tgt_path, mmap_mode="r")
+            dates_arr = np.load(date_path, mmap_mode="r")
+            n_rows = feat.shape[0]
+            self.n_features = feat.shape[1]
+
+            end = n_rows - cfg.forecast_horizon
+            lo, hi = self._temporal_bounds(warmup, end, cfg)
+
+            for i in range(lo, hi, cfg.daily_stride):
+                if np.isnan(tgt[i]):
+                    continue
+                od = int(dates_arr[i])
+                if od <= 0:
+                    continue
+                if od not in date_data:
+                    date_data[od] = {}
+                date_data[od][ticker] = i
+
+        # Keep only dates with enough tickers
+        self.dates = sorted(
+            od for od, tmap in date_data.items()
+            if len(tmap) >= min_tickers_per_date
+        )
+        self.date_data = date_data
+
+        logger.info(
+            f"CrossSectionalGraphDataset[{split_name}]: {len(self.dates)} dates, "
+            f"{len(self.tickers)} tickers, {self.n_features} features"
+        )
+
+    def _temporal_bounds(self, warmup: int, end: int, cfg) -> Tuple[int, int]:
+        if cfg.split_mode != "temporal":
+            return warmup, end
+        usable = end - warmup
+        if usable <= 0:
+            return warmup, warmup
+        train_end = warmup + int(usable * cfg.temporal_train_frac)
+        val_end = train_end + int(usable * cfg.temporal_val_frac)
+        if self.split_name == "train":
+            return warmup, train_end
+        elif self.split_name == "val":
+            return train_end, val_end
+        else:
+            return val_end, end
+
+    def __len__(self) -> int:
+        return len(self.dates)
+
+    def __getitem__(self, idx: int):
+        od = self.dates[idx]
+        ticker_rows = self.date_data[od]
+
+        N = len(self.tickers)
+        F = self.n_features
+
+        node_features = np.zeros((N, F), dtype=np.float32)
+        targets = np.zeros(N, dtype=np.float32)
+        mask = np.zeros(N, dtype=bool)
+
+        for ticker, row in ticker_rows.items():
+            ti = self.ticker_to_idx[ticker]
+            feat = np.load(self.cache / f"{ticker}_features.npy", mmap_mode="r")
+            tgt = np.load(self.cache / f"{ticker}_targets.npy", mmap_mode="r")
+            # Use the feature vector at the specific row (most recent daily state)
+            node_features[ti] = feat[row]
+            targets[ti] = tgt[row]
+            mask[ti] = True
+
+        return {
+            "node_features": torch.from_numpy(node_features),   # (N, F)
+            "targets": torch.from_numpy(targets),                # (N,)
+            "ordinal_date": od,
+            "tickers": self.tickers,
+            "edge_index": self.edge_index,       # shared, constant
+            "edge_weight": self.edge_weight,
+            "mask": torch.from_numpy(mask),      # (N,)
+        }
+
+
+def create_graph_dataloaders(
+    splits: Dict[str, List[str]],
+    cfg: HierarchicalDataConfig,
+    batch_size: int = 1,
+    num_workers: int = 0,
+    min_tickers_per_date: int = 10,
+) -> Dict:
+    """Create DataLoaders for cross-sectional graph snapshots.
+
+    Note: batch_size should typically be 1 because each sample is already
+    a full cross-section (all tickers for one date).  The collate function
+    is the default — stacking dicts is handled in the training loop.
+
+    Returns:
+        {
+            'train': DataLoader, 'val': DataLoader, 'test': DataLoader,
+            'n_features': int, 'n_tickers': int, 'edge_index': Tensor,
+            'edge_weight': Tensor,
+        }
+    """
+    result: Dict = {}
+    ds_ref = None
+    for split_name in ["train", "val", "test"]:
+        tickers = splits[split_name]
+        shuffle = split_name == "train"
+        ds = CrossSectionalGraphDataset(
+            tickers, cfg, split_name=split_name,
+            min_tickers_per_date=min_tickers_per_date,
+        )
+        if ds_ref is None:
+            ds_ref = ds
+        result[split_name] = DataLoader(
+            ds,
+            batch_size=batch_size,
+            shuffle=shuffle if len(ds) > 0 else False,
+            num_workers=num_workers,
+            pin_memory=False,   # dict items handled manually
+        )
+    result["n_features"] = ds_ref.n_features if ds_ref else 0
+    result["n_tickers"] = len(ds_ref.tickers) if ds_ref else 0
+    result["edge_index"] = ds_ref.edge_index if ds_ref else torch.zeros(2, 0, dtype=torch.long)
+    result["edge_weight"] = ds_ref.edge_weight if ds_ref else torch.zeros(0)
     return result

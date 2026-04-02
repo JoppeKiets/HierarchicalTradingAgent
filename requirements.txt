@@ -40,3 +40,8 @@ ipython>=7.0.0
 
 # Monitoring
 tensorboard>=2.8.0
+
+# LLM feature engineering (local Ollama REST API – no extra Python client needed;
+# requests is already listed above.  The ollama package is optional and provides
+# a typed client, but the plain requests path works without it.)
+# ollama>=0.1.0  # optional – uncomment if you prefer the typed SDK

@@ -133,7 +133,7 @@ Set up a systemd service that collects minute data every hour, rotating through 
 
 ```bash
 # Install and start the collector service
-sudo bash setup_collector_service.sh
+sudo bash infra/setup_collector_service.sh
 sudo systemctl enable minute-collector
 sudo systemctl start minute-collector
 
@@ -144,7 +144,7 @@ sudo systemctl status minute-collector
 tail -f logs/minute_collector.log
 ```
 
-The service is configured in `minute-collector.service`. By default it collects all tickers in `data/organized/` in batches of 500 per hour.
+The service is configured in `infra/minute-collector.service`. By default it collects all tickers in `data/organized/` in batches of 500 per hour.
 
 > **Important:** Minute data accumulates over weeks and months. With only a few weeks of data, the minute models have very limited training signal. The daily models work well from day one; the minute models become increasingly useful after ~2–3 months of collection.
 
@@ -220,6 +220,71 @@ python train_hierarchical.py --phase 3 --resume models/my_run/checkpoint_phase2.
 python train_hierarchical.py --phase 4 --resume models/my_run/checkpoint_phase3.pt
 ```
 
+---
+
+## Closed-Loop Self-Improvement (Fully Autonomous)
+
+The repository includes an end-to-end autonomous loop script at
+`scripts/closed_loop_self_improvement.py` that runs:
+
+1. **Deploy agents** with current model (`run_swing_pipeline.py`)
+2. **Collect outcomes** in `data/trade_journal/trade_journal.jsonl`
+   (fills `actual_return`, `exit_price`, `exit_timestamp` after an N-day horizon)
+3. **Analyst auto feature engineering**:
+  - proposes feature combinations,
+  - auto-generates feature code (`src/features/generated_features.py`),
+  - runs ablation IC tests,
+  - promotes only features that improve IC
+4. **Generate Critic training report** with:
+   - weak regimes,
+   - unreliable tickers,
+   - regime-feature drift signals
+5. **Auto-trigger retraining**:
+  - normal case: selective retrain (`--phase 3 4`)
+  - if new features were promoted: full retrain (`--phase 0 1 2 3 4 --force-preprocess`)
+6. **Redeploy** the newly trained model automatically
+
+### One-cycle run
+
+```bash
+python scripts/closed_loop_self_improvement.py \
+  --model models/hierarchical_v10/forecaster_final.pt \
+  --iterations 1 \
+  --outcome-horizon-days 5 \
+  --feature-min-ic-improvement 0.001 \
+  --top-n 20 \
+  --min-agreement 0.50 \
+  --min-return 0.001
+```
+
+### Daemon-style multi-cycle run (no human in loop)
+
+```bash
+python scripts/closed_loop_self_improvement.py \
+  --model models/hierarchical_v10/forecaster_final.pt \
+  --iterations 30 \
+  --sleep-hours 24 \
+  --outcome-horizon-days 5
+```
+
+### Outputs
+
+- Training reports: `data/closed_loop/reports/latest_training_report.json`
+- Timestamped reports: `data/closed_loop/reports/training_report_*.json`
+- Feature-engineering reports: `data/feature_feedback/generated_feature_reports/latest_feature_engineering.json`
+- Accepted generated features: `data/feature_feedback/accepted_generated_features.json`
+- Generated feature code: `src/features/generated_features.py`
+- New retrained models: `models/closed_loop/selective_*/forecaster_final.pt`
+
+### Useful feature-engineering flags
+
+- `--enable-feature-engineering` / `--no-enable-feature-engineering`
+- `--feature-min-ic-improvement` (default `0.001`)
+- `--feature-max-candidates` (default `5`)
+- `--feature-max-tickers-sample` (default `200`)
+- `--feature-max-rows-per-ticker` (default `250`)
+
+
 ### Background Training
 
 For long runs, use `nohup` so training survives terminal disconnection:
@@ -274,11 +339,22 @@ python scripts/walk_forward_hierarchical.py --model models/my_run/forecaster_fin
 
 ```
 train_hierarchical.py          # Main training entry point
-config.py                      # Training configuration presets
 collect_minute_data.py         # Minute data collection service
-minute-collector.service       # systemd service definition
-setup_collector_service.sh     # Service installer script
 requirements.txt               # Python dependencies
+
+infra/
+  minute-collector.service     # systemd service — minute data collector
+  news-collector.service       # systemd service — news collector
+  news-embedding-batch.service # systemd service — FinBERT batch encoder
+  news-embedding-batch.timer   # Timer — weekly Sunday 2 AM
+  paper-trader.service         # systemd service — daily signal generation
+  paper-trader.timer           # Timer — Mon–Fri 09:35 ET
+  paper-trader-intraday.service# systemd service — intraday stop/TP checker
+  paper-trader-intraday.timer  # Timer — every 15 min during market hours
+  setup_collector_service.sh   # Install minute-collector service
+  setup_news_collector_service.sh  # Install news-collector service
+  setup_news_embedding_batch_service.sh  # Install FinBERT batch service
+  setup_paper_trader.sh        # Install all paper-trader units
 
 src/
   hierarchical_data.py         # Data loading, feature caching, lazy datasets

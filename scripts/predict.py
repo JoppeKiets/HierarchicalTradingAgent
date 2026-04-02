@@ -114,43 +114,36 @@ def generate_predictions(
             continue
 
         daily_x = data["daily"].unsqueeze(0).to(device)
-
-        # Run daily sub-models
-        d1 = forecaster.lstm_d(daily_x)
-        d2 = forecaster.tft_d(daily_x)
-
         has_minute = data["minute"] is not None
-        if has_minute:
-            minute_x = data["minute"].unsqueeze(0).to(device)
-            m1 = forecaster.lstm_m(minute_x)
-            m2 = forecaster.tft_m(minute_x)
-        else:
-            m1_pred = torch.tensor([0.0])
-            m1_emb = torch.zeros(E)
-            m2_pred = torch.tensor([0.0])
-            m2_emb = torch.zeros(E)
+        minute_x = data["minute"].unsqueeze(0).to(device) if has_minute else None
 
-        # Build meta inputs
-        if has_minute:
-            pred_vec = torch.stack([
-                d1["prediction"][0], d2["prediction"][0],
-                m1["prediction"][0], m2["prediction"][0],
-            ]).unsqueeze(0).to(device)
-            emb_list = [
-                d1["embedding"][:1], d2["embedding"][:1],
-                m1["embedding"][:1], m2["embedding"][:1],
-            ]
-        else:
-            pred_vec = torch.stack([
-                d1["prediction"][0], d2["prediction"][0],
-                torch.tensor(0.0, device=device),
-                torch.tensor(0.0, device=device),
-            ]).unsqueeze(0)
-            zero_emb = torch.zeros(1, E, device=device)
-            emb_list = [
-                d1["embedding"][:1], d2["embedding"][:1],
-                zero_emb, zero_emb,
-            ]
+        # Run each sub-model via the registry — works for any combination of
+        # lstm_d / tft_d / tcn_d / lstm_m / tft_m / news / fund_mlp / gnn
+        sub_preds: Dict[str, torch.Tensor] = {}
+        sub_embs: Dict[str, torch.Tensor] = {}
+        for name in forecaster.sub_model_names:
+            modality = forecaster.MODALITY[name]
+            if modality == "daily":
+                x_in = daily_x
+            elif modality == "minute":
+                if not has_minute:
+                    sub_preds[name] = torch.zeros(1, device=device)
+                    sub_embs[name] = torch.zeros(1, E, device=device)
+                    continue
+                x_in = minute_x
+            else:
+                # news / fundamental / graph — skip for now (no single-ticker loader)
+                sub_preds[name] = torch.zeros(1, device=device)
+                sub_embs[name] = torch.zeros(1, E, device=device)
+                continue
+            out = forecaster.sub_models[name](x_in)
+            sub_preds[name] = out["prediction"]   # (1,)
+            sub_embs[name] = out["embedding"]      # (1, E)
+
+        # Build meta inputs in sub_model_names order
+        names = forecaster.sub_model_names
+        pred_vec = torch.stack([sub_preds[n][0] for n in names]).unsqueeze(0)  # (1, N)
+        emb_list = [sub_embs[n] for n in names]                                # [(1, E), ...]
 
         # Regime
         ord_date = data["date"]
@@ -160,25 +153,24 @@ def generate_predictions(
             regime_vec = torch.zeros(1, R, device=device)
 
         meta_out = forecaster.meta(pred_vec, emb_list, regime_vec)
-
         attn = meta_out["attention_weights"][0].cpu().numpy()
 
-        predictions.append({
+        entry = {
             "ticker": ticker,
             "predicted_return": float(meta_out["prediction"][0].cpu()),
-            "lstm_d_pred": float(d1["prediction"][0].cpu()),
-            "tft_d_pred": float(d2["prediction"][0].cpu()),
-            "lstm_m_pred": float(m1["prediction"][0].cpu()) if has_minute else 0.0,
-            "tft_m_pred": float(m2["prediction"][0].cpu()) if has_minute else 0.0,
-            "attention_weights": {
-                "lstm_d": float(attn[0]),
-                "tft_d": float(attn[1]),
-                "lstm_m": float(attn[2]),
-                "tft_m": float(attn[3]),
-            },
+            "attention_weights": {n: float(attn[i]) for i, n in enumerate(names)},
             "has_minute_data": has_minute,
             "data_date_ordinal": ord_date,
-        })
+        }
+        # Back-compat keys for downstream consumers
+        for name in names:
+            entry[f"{name}_pred"] = float(sub_preds[name][0].cpu())
+        # Legacy aliases used by screener_tools / analyst
+        entry.setdefault("lstm_d_pred", entry.get("lstm_d_pred", 0.0))
+        entry.setdefault("tft_d_pred", entry.get("tft_d_pred", 0.0))
+        entry.setdefault("lstm_m_pred", entry.get("lstm_m_pred", 0.0))
+        entry.setdefault("tft_m_pred", entry.get("tft_m_pred", 0.0))
+        predictions.append(entry)
 
     logger.info(f"Generated {len(predictions)} predictions, skipped {n_skipped}")
 

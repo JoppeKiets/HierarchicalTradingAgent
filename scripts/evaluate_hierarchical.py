@@ -88,17 +88,24 @@ def collect_predictions(
     daily_loader, minute_loader,
     data_cfg: HierarchicalDataConfig,
     device: torch.device,
+    news_loader=None,
+    fund_loader=None,
+    graph_loader=None,
 ) -> Dict[str, np.ndarray]:
     """Run the full hierarchical model and collect per-sample predictions.
 
+    Registry-aware: iterates over ``forecaster.sub_model_names`` so it
+    automatically supports any combination of sub-models (TCN_D, FundMLP, GNN, …).
+
     Returns dict with:
         meta_preds, targets, tickers, dates
-        lstm_d_preds, tft_d_preds, lstm_m_preds, tft_m_preds
-        attention_weights  (N, 4)
+        {name}_preds for each sub-model
+        attention_weights  (N, n_sub_models)
     """
     forecaster.eval()
     E = forecaster.cfg.embedding_dim
     R = forecaster.cfg.regime_dim
+    sub_names = forecaster.sub_model_names  # sorted list
 
     # Build regime lookup
     regime_df = _build_regime_dataframe(data_cfg)
@@ -108,124 +115,192 @@ def collect_predictions(
             if hasattr(d, 'toordinal'):
                 regime_lookup[d.toordinal()] = row.values.astype(np.float32)
 
-    # Collect daily sub-model outputs
-    daily_data = {}
-    for batch in daily_loader:
-        x, y, ordinal_dates, tickers_batch = batch
-        x = x.to(device)
-        d1 = forecaster.lstm_d(x)
-        d2 = forecaster.tft_d(x)
-        for i in range(len(y)):
-            key = (tickers_batch[i], int(ordinal_dates[i]))
-            daily_data[key] = {
-                "pred_lstm": d1["prediction"][i].cpu(),
-                "pred_tft": d2["prediction"][i].cpu(),
-                "emb_lstm": d1["embedding"][i].cpu(),
-                "emb_tft": d2["embedding"][i].cpu(),
-                "target": y[i],
-            }
+    import gc
 
-    # Collect minute sub-model outputs
-    minute_data = {}
-    for batch in minute_loader:
-        x, y, ordinal_dates, tickers_batch = batch
-        x = x.to(device)
-        m1 = forecaster.lstm_m(x)
-        m2 = forecaster.tft_m(x)
-        for i in range(len(y)):
-            key = (tickers_batch[i], int(ordinal_dates[i]))
-            minute_data[key] = {
-                "pred_lstm": m1["prediction"][i].cpu(),
-                "pred_tft": m2["prediction"][i].cpu(),
-                "emb_lstm": m1["embedding"][i].cpu(),
-                "emb_tft": m2["embedding"][i].cpu(),
-            }
+    # Data-source → loader mapping
+    loader_map = {
+        "daily":       daily_loader,
+        "minute":      minute_loader,
+        "news":        news_loader,
+        "fundamental": fund_loader,
+        "graph":       graph_loader,
+    }
 
-    # Align and prepare batched meta inference
-    zero_emb = torch.zeros(E)
+    # ── Collect outputs from each sub-model, keyed by (ticker, ordinal_date) ──
+    # per_model[name][(ticker, date)] = {"pred": tensor, "emb": tensor, "target": tensor}
+    per_model: Dict[str, Dict[Tuple, Dict]] = {}
 
-    # First pass: collect aligned data
-    aligned_preds, aligned_embs, aligned_regimes = [], [], []
-    aligned_lstm_d, aligned_tft_d, aligned_lstm_m, aligned_tft_m = [], [], [], []
-    aligned_targets, aligned_tickers, aligned_dates = [], [], []
+    for name in sub_names:
+        ds = HierarchicalForecaster.MODALITY[name]
+        loader = loader_map.get(ds)
+        if loader is None or len(loader.dataset) == 0:
+            logger.info(f"  {name}: no data loader for source '{ds}' — will zero-fill")
+            per_model[name] = {}
+            continue
 
-    for key, dd in daily_data.items():
-        ticker, ord_date = key
-        md = minute_data.get(key)
+        model = forecaster.sub_models[name]
+        model.to(device).eval()
+        result = {}
 
-        if md is not None:
-            pred_vec = torch.stack([
-                dd["pred_lstm"], dd["pred_tft"],
-                md["pred_lstm"], md["pred_tft"],
-            ])
-            emb_vec = torch.cat([
-                dd["emb_lstm"], dd["emb_tft"],
-                md["emb_lstm"], md["emb_tft"],
-            ])
+        if ds == "graph":
+            # GNN: cross-sectional batches
+            for batch in loader:
+                if isinstance(batch, dict):
+                    nf = batch["node_features"].squeeze(0).to(device)
+                    tgt = batch["targets"].squeeze(0)
+                    mask = batch["mask"].squeeze(0)
+                    ei = batch["edge_index"].squeeze(0).to(device)
+                    od = int(batch["ordinal_date"])
+                    tickers_list = batch["tickers"]
+                else:
+                    b = batch[0]
+                    nf = b["node_features"].to(device)
+                    tgt = b["targets"]
+                    mask = b["mask"]
+                    ei = b["edge_index"].to(device)
+                    od = int(b["ordinal_date"])
+                    tickers_list = b["tickers"]
+                mask_dev = mask.to(device)
+                out = model(nf, ei, mask_dev)
+                valid_tickers = [tickers_list[j] for j in range(len(tickers_list)) if mask[j]]
+                vi = 0
+                for j in range(len(tickers_list)):
+                    if mask[j]:
+                        key = (valid_tickers[vi], od)
+                        result[key] = {
+                            "pred": out["prediction"][vi].cpu(),
+                            "emb": out["embedding"][vi].cpu(),
+                            "target": tgt[j],
+                        }
+                        vi += 1
         else:
-            pred_vec = torch.stack([
-                dd["pred_lstm"], dd["pred_tft"],
-                torch.tensor(0.0), torch.tensor(0.0),
-            ])
-            emb_vec = torch.cat([
-                dd["emb_lstm"], dd["emb_tft"], zero_emb, zero_emb,
-            ])
+            for batch in loader:
+                x, y, ordinal_dates, tickers_batch = batch
+                x = x.to(device)
+                out = model(x)
+                for i in range(len(y)):
+                    key = (tickers_batch[i], int(ordinal_dates[i]))
+                    result[key] = {
+                        "pred": out["prediction"][i].cpu(),
+                        "emb": out["embedding"][i].cpu(),
+                        "target": y[i],
+                    }
+        per_model[name] = result
+        model.cpu()
+        gc.collect()
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+
+    # ── Determine the universe of keys from the "daily" source ──
+    # Daily loaders always present; this determines the universe of samples.
+    daily_names = [n for n in sub_names if HierarchicalForecaster.MODALITY[n] == "daily"]
+    all_keys: set = set()
+    for n in daily_names:
+        all_keys |= set(per_model[n].keys())
+    if not all_keys:
+        empty = {f"{n}_preds": np.array([]) for n in sub_names}
+        empty.update({"meta_preds": np.array([]), "targets": np.array([]),
+                       "dates": np.array([]), "attention_weights": np.array([]),
+                       "tickers": []})
+        return empty
+
+    # Use the first daily model to get targets
+    target_source = daily_names[0]
+
+    # ── Align all models ──
+    zero_emb = torch.zeros(E)
+    aligned_preds: Dict[str, List[float]] = {n: [] for n in sub_names}
+    aligned_pred_vecs: List[torch.Tensor] = []
+    aligned_emb_vecs: List[torch.Tensor] = []
+    aligned_regimes: List[torch.Tensor] = []
+    aligned_targets: List[float] = []
+    aligned_tickers: List[str] = []
+    aligned_dates: List[int] = []
+
+    for key in sorted(all_keys):
+        ticker, ord_date = key
+
+        # Get target from first daily model that has this key
+        target_val = None
+        for n in daily_names:
+            if key in per_model[n]:
+                target_val = per_model[n][key]["target"]
+                break
+        if target_val is None:
+            continue
+
+        pred_list = []
+        emb_list_raw = []
+        for name in sub_names:
+            entry = per_model[name].get(key)
+            if entry is not None:
+                pred_list.append(entry["pred"])
+                emb_list_raw.append(entry["emb"])
+                aligned_preds[name].append(entry["pred"].item())
+            else:
+                pred_list.append(torch.tensor(0.0))
+                emb_list_raw.append(zero_emb)
+                aligned_preds[name].append(0.0)
+
+        pred_vec = torch.stack(pred_list)
+        emb_vec = torch.cat(emb_list_raw)
 
         if ord_date in regime_lookup:
             regime_vec = torch.from_numpy(regime_lookup[ord_date])
         else:
             regime_vec = torch.zeros(R)
 
-        aligned_preds.append(pred_vec)
-        aligned_embs.append(emb_vec)
+        aligned_pred_vecs.append(pred_vec)
+        aligned_emb_vecs.append(emb_vec)
         aligned_regimes.append(regime_vec)
-        aligned_lstm_d.append(dd["pred_lstm"].item())
-        aligned_tft_d.append(dd["pred_tft"].item())
-        aligned_lstm_m.append(md["pred_lstm"].item() if md else 0.0)
-        aligned_tft_m.append(md["pred_tft"].item() if md else 0.0)
-        aligned_targets.append(dd["target"].item())
+        aligned_targets.append(target_val.item() if hasattr(target_val, 'item') else float(target_val))
         aligned_tickers.append(ticker)
         aligned_dates.append(ord_date)
 
-    if not aligned_preds:
-        return {k: np.array([]) for k in [
-            "meta_preds", "targets", "dates", "attention_weights",
-            "lstm_d_preds", "tft_d_preds", "lstm_m_preds", "tft_m_preds",
-        ]}
+    if not aligned_pred_vecs:
+        empty = {f"{n}_preds": np.array([]) for n in sub_names}
+        empty.update({"meta_preds": np.array([]), "targets": np.array([]),
+                       "dates": np.array([]), "attention_weights": np.array([]),
+                       "tickers": []})
+        return empty
 
-    # Batched meta inference (much faster than one-at-a-time)
-    from torch.utils.data import TensorDataset, DataLoader as DL
-
-    all_pred_t = torch.stack(aligned_preds)       # (N, 4)
-    all_emb_t = torch.stack(aligned_embs)          # (N, 4*E)
-    all_regime_t = torch.stack(aligned_regimes)    # (N, R)
+    # ── Batched meta inference ──
+    N_SUB = len(sub_names)
+    all_pred_t = torch.stack(aligned_pred_vecs)       # (N, N_SUB)
+    all_emb_t = torch.stack(aligned_emb_vecs)          # (N, N_SUB*E)
+    all_regime_t = torch.stack(aligned_regimes)         # (N, R)
 
     meta_preds_out, attn_weights_out = [], []
     batch_size = 1024
-    forecaster.meta.eval()
+    forecaster.meta.to(device).eval()
 
     for start in range(0, len(all_pred_t), batch_size):
         end = min(start + batch_size, len(all_pred_t))
         p_b = all_pred_t[start:end].to(device)
         e_b = all_emb_t[start:end].to(device)
         r_b = all_regime_t[start:end].to(device)
-        emb_list = [e_b[:, i*E:(i+1)*E] for i in range(4)]
+        emb_list = [e_b[:, i*E:(i+1)*E] for i in range(N_SUB)]
 
         meta_out = forecaster.meta(p_b, emb_list, r_b)
         meta_preds_out.append(meta_out["prediction"].cpu().numpy())
         attn_weights_out.append(meta_out["attention_weights"].cpu().numpy())
 
+    forecaster.meta.cpu()
+    gc.collect()
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+
     results = {
         "meta_preds": np.concatenate(meta_preds_out),
         "attention_weights": np.concatenate(attn_weights_out),
-        "lstm_d_preds": np.array(aligned_lstm_d),
-        "tft_d_preds": np.array(aligned_tft_d),
-        "lstm_m_preds": np.array(aligned_lstm_m),
-        "tft_m_preds": np.array(aligned_tft_m),
         "targets": np.array(aligned_targets),
         "tickers": aligned_tickers,
         "dates": np.array(aligned_dates),
+        "sub_model_names": sub_names,
     }
+    # Add per-model predictions
+    for name in sub_names:
+        results[f"{name}_preds"] = np.array(aligned_preds[name])
 
     return results
 
@@ -386,57 +461,67 @@ def backtest_long_only(
 def analyze_sub_model_contributions(results: Dict) -> Dict:
     """Analyze which sub-models contribute most to predictions.
 
+    Registry-aware: reads sub_model_names from results dict.
+
     Computes:
       - Per-model IC and directional accuracy
       - Attention weight statistics
       - Meta model improvement over best sub-model
     """
     targets = results["targets"]
+    sub_names = results.get("sub_model_names", ["lstm_d", "tft_d", "lstm_m", "tft_m"])
     analysis = {}
 
     # Per sub-model metrics
-    for name, key in [
-        ("LSTM_D", "lstm_d_preds"),
-        ("TFT_D",  "tft_d_preds"),
-        ("LSTM_M", "lstm_m_preds"),
-        ("TFT_M",  "tft_m_preds"),
-        ("Meta",   "meta_preds"),
-    ]:
+    for name in sub_names:
+        key = f"{name}_preds"
+        if key not in results or len(results[key]) == 0:
+            continue
         preds = results[key]
         m = compute_metrics(preds, targets)
-        analysis[name] = {
+        analysis[name.upper()] = {
             "ic": m["ic"], "rank_ic": m["rank_ic"],
             "dir_acc": m["directional_accuracy"],
             "mse": m["mse"],
         }
 
-    # Attention weight analysis
+    # Meta ensemble
+    m = compute_metrics(results["meta_preds"], targets)
+    analysis["Meta"] = {
+        "ic": m["ic"], "rank_ic": m["rank_ic"],
+        "dir_acc": m["directional_accuracy"],
+        "mse": m["mse"],
+    }
+
+    # Attention weight analysis (dynamic number of sub-models)
     attn = results["attention_weights"]
-    if attn.ndim == 2 and attn.shape[1] == 4:
+    if attn.ndim == 2 and attn.shape[1] == len(sub_names):
         analysis["attention_stats"] = {
             "mean_weights": [round(float(x), 4) for x in attn.mean(axis=0)],
             "std_weights": [round(float(x), 4) for x in attn.std(axis=0)],
-            "model_names": ["LSTM_D", "TFT_D", "LSTM_M", "TFT_M"],
+            "model_names": [n.upper() for n in sub_names],
         }
 
-    # Simple ensemble baseline (equal-weight average of 4 sub-models)
-    equal_avg = (
-        results["lstm_d_preds"] + results["tft_d_preds"] +
-        results["lstm_m_preds"] + results["tft_m_preds"]
-    ) / 4.0
-    eq_metrics = compute_metrics(equal_avg, targets)
-    analysis["equal_weight_avg"] = {
-        "ic": eq_metrics["ic"], "rank_ic": eq_metrics["rank_ic"],
-        "dir_acc": eq_metrics["directional_accuracy"],
-    }
+    # Equal-weight average of all sub-models
+    sub_preds = [results[f"{n}_preds"] for n in sub_names if f"{n}_preds" in results]
+    if sub_preds:
+        equal_avg = np.mean(sub_preds, axis=0)
+        eq_metrics = compute_metrics(equal_avg, targets)
+        analysis["equal_weight_avg"] = {
+            "ic": eq_metrics["ic"], "rank_ic": eq_metrics["rank_ic"],
+            "dir_acc": eq_metrics["directional_accuracy"],
+        }
 
     # Daily-only average
-    daily_avg = (results["lstm_d_preds"] + results["tft_d_preds"]) / 2.0
-    da_metrics = compute_metrics(daily_avg, targets)
-    analysis["daily_avg"] = {
-        "ic": da_metrics["ic"], "rank_ic": da_metrics["rank_ic"],
-        "dir_acc": da_metrics["directional_accuracy"],
-    }
+    daily_names = [n for n in sub_names if n in ("lstm_d", "tft_d", "tcn_d")]
+    daily_sub_preds = [results[f"{n}_preds"] for n in daily_names if f"{n}_preds" in results]
+    if daily_sub_preds:
+        daily_avg = np.mean(daily_sub_preds, axis=0)
+        da_metrics = compute_metrics(daily_avg, targets)
+        analysis["daily_avg"] = {
+            "ic": da_metrics["ic"], "rank_ic": da_metrics["rank_ic"],
+            "dir_acc": da_metrics["directional_accuracy"],
+        }
 
     return analysis
 
@@ -456,10 +541,10 @@ def evaluate(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Device: {device}")
 
-    # Load model
+    # Load model onto CPU first; sub-models are moved to GPU one-at-a-time
+    # during collect_predictions to avoid OOM on large datasets.
     logger.info(f"Loading model from {model_path}")
-    forecaster = HierarchicalForecaster.load(model_path, device=str(device))
-    forecaster = forecaster.to(device)
+    forecaster = HierarchicalForecaster.load(model_path, device="cpu")
     forecaster.eval()
 
     total_params = sum(p.numel() for p in forecaster.parameters())
@@ -468,9 +553,12 @@ def evaluate(
     # Set up data
     tickers = get_viable_tickers(data_cfg)
     splits = split_tickers(tickers, data_cfg)
+    # Use small batches to avoid OOM: TFT attention on seq_len=720
+    # needs O(batch * seq^2) VRAM — batch=256 blows up to ~5 GB.
+    # num_workers=0 to avoid ConnectionResetError in background runs.
     loaders = create_dataloaders(
         splits, data_cfg,
-        batch_size_daily=256, batch_size_minute=128, num_workers=4,
+        batch_size_daily=32, batch_size_minute=16, num_workers=0,
     )
 
     os.makedirs(output_dir, exist_ok=True)
@@ -530,20 +618,26 @@ def evaluate(
 
     contributions = analyze_sub_model_contributions(results)
 
+    sub_names = results.get("sub_model_names", ["lstm_d", "tft_d", "lstm_m", "tft_m"])
+
     logger.info(f"\n  {'Model':<18} {'IC':>8} {'RankIC':>8} {'DirAcc':>8} {'MSE':>10}")
     logger.info("  " + "-" * 56)
-    for name in ["LSTM_D", "TFT_D", "LSTM_M", "TFT_M", "Meta"]:
+    for name in [n.upper() for n in sub_names] + ["Meta"]:
+        if name not in contributions:
+            continue
         c = contributions[name]
         marker = " ★" if name == "Meta" else ""
         logger.info(f"  {name:<18} {c['ic']:>8.4f} {c['rank_ic']:>8.4f} "
                     f"{c['dir_acc']:>8.3f} {c['mse']:>10.6f}{marker}")
 
-    eq = contributions["equal_weight_avg"]
-    logger.info(f"  {'EqualWeightAvg':<18} {eq['ic']:>8.4f} {eq['rank_ic']:>8.4f} "
-                f"{eq['dir_acc']:>8.3f}")
-    da = contributions["daily_avg"]
-    logger.info(f"  {'DailyAvg':<18} {da['ic']:>8.4f} {da['rank_ic']:>8.4f} "
-                f"{da['dir_acc']:>8.3f}")
+    if "equal_weight_avg" in contributions:
+        eq = contributions["equal_weight_avg"]
+        logger.info(f"  {'EqualWeightAvg':<18} {eq['ic']:>8.4f} {eq['rank_ic']:>8.4f} "
+                    f"{eq['dir_acc']:>8.3f}")
+    if "daily_avg" in contributions:
+        da = contributions["daily_avg"]
+        logger.info(f"  {'DailyAvg':<18} {da['ic']:>8.4f} {da['rank_ic']:>8.4f} "
+                    f"{da['dir_acc']:>8.3f}")
 
     if "attention_stats" in contributions:
         attn = contributions["attention_stats"]
@@ -649,17 +743,17 @@ def evaluate(
 
     # Save predictions for further analysis
     pred_path = os.path.join(output_dir, "predictions.npz")
-    np.savez_compressed(
-        pred_path,
-        meta_preds=results["meta_preds"],
-        targets=results["targets"],
-        dates=results["dates"],
-        lstm_d_preds=results["lstm_d_preds"],
-        tft_d_preds=results["tft_d_preds"],
-        lstm_m_preds=results["lstm_m_preds"],
-        tft_m_preds=results["tft_m_preds"],
-        attention_weights=results["attention_weights"],
-    )
+    save_dict = {
+        "meta_preds": results["meta_preds"],
+        "targets": results["targets"],
+        "dates": results["dates"],
+        "attention_weights": results["attention_weights"],
+    }
+    for name in sub_names:
+        key = f"{name}_preds"
+        if key in results:
+            save_dict[key] = results[key]
+    np.savez_compressed(pred_path, **save_dict)
     logger.info(f"  Predictions saved → {pred_path}")
 
     # ─── Summary ──────────────────────────────────────────────────────
