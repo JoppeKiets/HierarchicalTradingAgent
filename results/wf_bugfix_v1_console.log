@@ -1,0 +1,9 @@
+usage: walk_forward_hierarchical.py [-h] [--n-windows N_WINDOWS]
+                                    [--phases PHASES [PHASES ...]]
+                                    [--epochs EPOCHS] [--patience PATIENCE]
+                                    [--batch-size BATCH_SIZE] [--top-k TOP_K]
+                                    [--num-workers NUM_WORKERS]
+                                    [--output-dir OUTPUT_DIR]
+                                    [--force-preprocess] [--rolling]
+                                    [--purge-horizon PURGE_HORIZON]
+walk_forward_hierarchical.py: error: unrecognized arguments: --results-dir results/wf_bugfix_v1

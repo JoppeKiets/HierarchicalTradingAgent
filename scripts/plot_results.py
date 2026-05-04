@@ -249,13 +249,28 @@ def collect_test_predictions(model_dir: str,
 
     results: Dict[str, Dict] = {}
 
+    # Check that at least one loader has data before running inference
+    daily_loader = modality_loaders.get("daily")
+    minute_loader = modality_loaders.get("minute")
+    n_daily = len(daily_loader.dataset) if daily_loader is not None else 0
+    n_minute = len(minute_loader.dataset) if minute_loader is not None else 0
+    if n_daily == 0 and n_minute == 0:
+        daily_cache = Path(data_cfg.cache_dir) / "daily"
+        minute_cache = Path(data_cfg.cache_dir) / "minute"
+        print(f"\n  ⚠  Test datasets are EMPTY — feature cache is missing or stale.")
+        print(f"     Expected daily cache:  {daily_cache}")
+        print(f"     Expected minute cache: {minute_cache}")
+        print(f"     → Re-run preprocessing:  python train_hierarchical.py --phase 0")
+        print(f"     → Then retry:            python scripts/plot_results.py --model-dir {model_dir}")
+        return None
+
     with torch.no_grad():
         for name in forecaster.sub_model_names:
             modality = HierarchicalForecaster.MODALITY.get(name, "daily")
             if modality == "graph":
                 continue  # GNN cross-sectional — skip for per-sample plots
             loader = modality_loaders.get(modality)
-            if loader is None:
+            if loader is None or len(loader.dataset) == 0:
                 continue
             sub = forecaster.sub_models[name].to(device).eval()
             preds, targets, dates = [], [], []
@@ -272,6 +287,10 @@ def collect_test_predictions(model_dir: str,
                 "targets": np.array(targets),
                 "dates": np.array(dates),
             }
+
+    if not results:
+        print(f"\n  ⚠  No sub-model produced predictions (all loaders were empty).")
+        return None
 
     return results
 
@@ -1196,9 +1215,9 @@ def plot_diagnostic_dashboard(
     meta_keys  = [k for k in histories if "meta" in k.lower() or "joint" in k.lower()]
     if meta_keys:
         for key in meta_keys[:3]:
-            df = histories[key]
-            if "val_loss" in df.columns:
-                ax01.plot(df.index, df["val_loss"],
+            data = histories[key]
+            if "val_loss" in data:
+                ax01.plot(data["epoch"], data["val_loss"],
                           label=_display_name(key), lw=1.5, alpha=0.85)
         ax01.set_title("Meta / Joint Val Loss", fontweight="bold")
         ax01.set_xlabel("Epoch")
@@ -1209,6 +1228,24 @@ def plot_diagnostic_dashboard(
         ax01.text(0.5, 0.5, "No meta/joint history found",
                   ha="center", va="center", transform=ax01.transAxes, fontsize=10)
         ax01.set_title("Meta / Joint Val Loss", fontweight="bold")
+
+    # ── Normalise pred_data to list-of-dicts format ──────────────────────────
+    # collect_test_predictions returns {name: {"preds": arr, "targets": arr, "dates": arr}}
+    # but this function expects {name: [{"pred": v, "target": v, "date": v}, ...]}
+    def _to_rows(entry):
+        if isinstance(entry, list):
+            return entry
+        import datetime as _dt
+        preds   = entry.get("preds",   [])
+        targets = entry.get("targets", [])
+        dates   = entry.get("dates",   [])
+        return [
+            {"pred": float(p), "target": float(t),
+             "date": _dt.date.fromordinal(int(d)).isoformat() if d else None}
+            for p, t, d in zip(preds, targets, dates)
+        ]
+
+    pred_data = {k: _to_rows(v) for k, v in pred_data.items()} if pred_data else {}
 
     # ── Panel 1,0 : Monthly IC bars (first model only) ───────────────────────
     ax10 = fig.add_subplot(gs[1, 0])

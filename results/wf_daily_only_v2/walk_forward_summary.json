@@ -1,0 +1,201 @@
+{
+  "n_windows": 5,
+  "best_fold_idx": 0,
+  "best_fold_val_ic": 0.04,
+  "phases": [
+    1,
+    2,
+    3
+  ],
+  "epochs": 20,
+  "expanding_window": false,
+  "purge_horizon": 0,
+  "per_window": [
+    {
+      "window": 0,
+      "dates": {
+        "train": [
+          716242,
+          726098
+        ],
+        "val": [
+          726100,
+          728211
+        ],
+        "test": [
+          728211,
+          730324
+        ]
+      },
+      "val_ic": 0.04,
+      "regression_metrics": {
+        "ic": 0.02258807492378842,
+        "rank_ic": 0.021891139018692614,
+        "directional_accuracy": 0.4563817857093411,
+        "mse": 1.0497185882973317,
+        "n_samples": 72229
+      },
+      "long_short": {
+        "sharpe": 0.8726,
+        "max_drawdown": -0.1943,
+        "total_return": 0.8709,
+        "n_days": 1461
+      },
+      "elapsed_seconds": 778.3,
+      "n_train": 49178,
+      "n_test": 72229
+    },
+    {
+      "window": 1,
+      "dates": {
+        "train": [
+          718589,
+          728445
+        ],
+        "val": [
+          728447,
+          730558
+        ],
+        "test": [
+          730558,
+          732671
+        ]
+      },
+      "val_ic": 0.0241,
+      "regression_metrics": {
+        "ic": 0.03262896979081554,
+        "rank_ic": 0.03016418391848672,
+        "directional_accuracy": 0.509498587249816,
+        "mse": 0.8912717734546188,
+        "n_samples": 110069
+      },
+      "long_short": {
+        "sharpe": 1.7595,
+        "max_drawdown": -0.1269,
+        "total_return": 1.4693,
+        "n_days": 1454
+      },
+      "elapsed_seconds": 1015.2,
+      "n_train": 102073,
+      "n_test": 110069
+    },
+    {
+      "window": 2,
+      "dates": {
+        "train": [
+          720936,
+          730792
+        ],
+        "val": [
+          730794,
+          732905
+        ],
+        "test": [
+          732905,
+          735018
+        ]
+      },
+      "val_ic": 0.0319,
+      "regression_metrics": {
+        "ic": -0.012439826063565375,
+        "rank_ic": 0.02774766652070962,
+        "directional_accuracy": 0.5076524399762715,
+        "mse": 0.9947731451703948,
+        "n_samples": 160145
+      },
+      "long_short": {
+        "sharpe": 1.6315,
+        "max_drawdown": -0.0896,
+        "total_return": 1.3464,
+        "n_days": 1455
+      },
+      "elapsed_seconds": 1849.1,
+      "n_train": 186930,
+      "n_test": 160145
+    },
+    {
+      "window": 3,
+      "dates": {
+        "train": [
+          723283,
+          733139
+        ],
+        "val": [
+          733141,
+          735252
+        ],
+        "test": [
+          735252,
+          737365
+        ]
+      },
+      "val_ic": 0.0351,
+      "regression_metrics": {
+        "ic": 0.03138221385148268,
+        "rank_ic": 0.02412732386857532,
+        "directional_accuracy": 0.5078414197745509,
+        "mse": 0.9958156607653552,
+        "n_samples": 227191
+      },
+      "long_short": {
+        "sharpe": 0.9785,
+        "max_drawdown": -0.0957,
+        "total_return": 0.5028,
+        "n_days": 1458
+      },
+      "elapsed_seconds": 2622.4,
+      "n_train": 305313,
+      "n_test": 227191
+    },
+    {
+      "window": 4,
+      "dates": {
+        "train": [
+          725630,
+          735486
+        ],
+        "val": [
+          735488,
+          737599
+        ],
+        "test": [
+          737599,
+          739712
+        ]
+      },
+      "val_ic": 0.0379,
+      "regression_metrics": {
+        "ic": 0.015795191029014204,
+        "rank_ic": 0.016777519497054402,
+        "directional_accuracy": 0.5063094116782567,
+        "mse": 0.8717626449132574,
+        "n_samples": 299394
+      },
+      "long_short": {
+        "sharpe": -0.0885,
+        "max_drawdown": -0.3113,
+        "total_return": -0.0442,
+        "n_days": 1418
+      },
+      "elapsed_seconds": 5700.3,
+      "n_train": 464871,
+      "n_test": 299394
+    }
+  ],
+  "aggregate": {
+    "ic_mean": 0.018,
+    "ic_std": 0.0164,
+    "rank_ic_mean": 0.0241,
+    "dir_acc_mean": 0.4975,
+    "sharpe_mean": 1.0307,
+    "sharpe_std": 0.6592,
+    "consistency": "4/5",
+    "val_ic_weights": [
+      0.2367,
+      0.1426,
+      0.1888,
+      0.2077,
+      0.2243
+    ]
+  }
+}

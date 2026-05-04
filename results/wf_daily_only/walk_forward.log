@@ -1,0 +1,2239 @@
+2026-05-02 16:42:21,861 [INFO] Device: cuda
+2026-05-02 16:42:21,861 [INFO] Walk-forward: 5 windows, phases=[1, 2, 3], epochs=20
+2026-05-02 16:42:38,255 [INFO] Found 4601 viable tickers (daily>=750, minute>=780)
+2026-05-02 16:42:38,255 [INFO] Viable tickers: 4601
+2026-05-02 16:42:40,269 [INFO] Date range: ordinal 716242—739712 (23470 days, ~64.3 years)
+2026-05-02 16:42:40,269 [INFO] Purge horizon: 1 days (forecast_horizon=1)
+2026-05-02 16:42:40,269 [INFO]   Window 0 (ROLLING): train=1962-01-02→1988-12-27, val=1988-12-29→1994-10-10, test→2000-07-23
+2026-05-02 16:42:40,269 [INFO]   Window 1 (ROLLING): train=1968-06-06→1995-06-01, val=1995-06-03→2001-03-14, test→2006-12-26
+2026-05-02 16:42:40,269 [INFO]   Window 2 (ROLLING): train=1974-11-09→2001-11-03, val=2001-11-05→2007-08-17, test→2013-05-30
+2026-05-02 16:42:40,269 [INFO]   Window 3 (ROLLING): train=1981-04-13→2008-04-07, val=2008-04-09→2014-01-19, test→2019-11-02
+2026-05-02 16:42:40,269 [INFO]   Window 4 (ROLLING): train=1987-09-16→2014-09-10, val=2014-09-12→2020-06-23, test→2026-04-06
+2026-05-02 16:42:40,308 [INFO] Hierarchical Forecaster parameter count:
+2026-05-02 16:42:40,308 [INFO]   lstm_d      :    253,959
+2026-05-02 16:42:40,309 [INFO]   tft_d       :    704,742
+2026-05-02 16:42:40,309 [INFO]   lstm_m      :    236,997
+2026-05-02 16:42:40,309 [INFO]   tft_m       :    310,870
+2026-05-02 16:42:40,309 [INFO]   news        :    392,993
+2026-05-02 16:42:40,309 [INFO]   meta        :     31,430
+2026-05-02 16:42:40,309 [INFO]   TOTAL       :  1,930,991
+2026-05-02 16:42:40,309 [INFO] 
+######################################################################
+2026-05-02 16:42:40,309 [INFO] # WINDOW 0/5
+2026-05-02 16:42:40,309 [INFO] ######################################################################
+2026-05-02 16:45:57,735 [INFO]   Daily:  train=49178, val=47043, test=72229
+2026-05-02 16:45:57,741 [INFO]   Minute: train=0, val=0, test=0
+2026-05-02 16:45:57,743 [INFO]   Skipping sub-models: ['lstm_m', 'tft_m', 'news'] (use_minute=False, use_news=False)
+2026-05-02 16:45:57,848 [INFO] Hierarchical Forecaster parameter count:
+2026-05-02 16:45:57,848 [INFO]   lstm_d      :    256,529
+2026-05-02 16:45:57,848 [INFO]   tft_d       :    774,258
+2026-05-02 16:45:57,848 [INFO]   meta        :     18,659
+2026-05-02 16:45:57,848 [INFO]   TOTAL       :  1,049,446
+2026-05-02 16:45:58,108 [INFO] 
+  Phase 1: Training daily models...
+2026-05-02 16:46:00,438 [INFO]   [LSTM_D] torch.compile() enabled
+2026-05-02 16:46:00,439 [INFO]   [LSTM_D] lr=3.00e-04  wd=1.0e-04  grad_clip=1.0  warmup_steps=0  amp=True
+2026-05-02 16:46:00,439 [INFO] 
+============================================================
+2026-05-02 16:46:00,439 [INFO] Training LSTM_D for 20 epochs
+2026-05-02 16:46:00,439 [INFO]   Train batches: 384, Val batches: 368
+2026-05-02 16:46:00,439 [INFO]   Parameters: 256,529
+2026-05-02 16:46:00,439 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 16:46:00,439 [INFO] ============================================================
+2026-05-02 16:46:04,782 [INFO]   [LSTM_D] batch 100/384 loss=0.384469 grad_norm=0.4949
+2026-05-02 16:46:07,513 [INFO]   [LSTM_D] batch 200/384 loss=0.377385 grad_norm=0.3690
+2026-05-02 16:46:10,174 [INFO]   [LSTM_D] batch 300/384 loss=0.375584 grad_norm=0.3004
+2026-05-02 16:46:21,317 [INFO] [LSTM_D] Epoch   1/20 | train=0.379674 | val=0.064219 | IC=0.0118 | RankIC=0.0059 | DirAcc=0.477 | lr=3.00e-04 | gn=0.264 | 20.9s
+2026-05-02 16:46:21,321 [INFO]   ★ New best IC=0.0118 | val_loss=0.064219
+2026-05-02 16:46:24,312 [INFO]   [LSTM_D] batch 100/384 loss=0.377505 grad_norm=0.1310
+2026-05-02 16:46:26,988 [INFO]   [LSTM_D] batch 200/384 loss=0.383471 grad_norm=0.1247
+2026-05-02 16:46:29,681 [INFO]   [LSTM_D] batch 300/384 loss=0.372433 grad_norm=0.1210
+2026-05-02 16:46:40,294 [INFO] [LSTM_D] Epoch   2/20 | train=0.377253 | val=0.064065 | IC=0.0210 | RankIC=0.0154 | DirAcc=0.477 | lr=2.98e-04 | gn=0.120 | 19.0s
+2026-05-02 16:46:40,296 [INFO]   ★ New best IC=0.0210 | val_loss=0.064065
+2026-05-02 16:46:43,271 [INFO]   [LSTM_D] batch 100/384 loss=0.373277 grad_norm=0.1269
+2026-05-02 16:46:45,967 [INFO]   [LSTM_D] batch 200/384 loss=0.377748 grad_norm=0.1200
+2026-05-02 16:46:48,653 [INFO]   [LSTM_D] batch 300/384 loss=0.379668 grad_norm=0.1191
+2026-05-02 16:46:59,228 [INFO] [LSTM_D] Epoch   3/20 | train=0.376770 | val=0.064505 | IC=0.0187 | RankIC=0.0143 | DirAcc=0.420 | lr=2.93e-04 | gn=0.118 | 18.9s
+2026-05-02 16:47:02,228 [INFO]   [LSTM_D] batch 100/384 loss=0.377564 grad_norm=0.1117
+2026-05-02 16:47:04,919 [INFO]   [LSTM_D] batch 200/384 loss=0.371954 grad_norm=0.1132
+2026-05-02 16:47:07,634 [INFO]   [LSTM_D] batch 300/384 loss=0.373910 grad_norm=0.1156
+2026-05-02 16:47:18,077 [INFO] [LSTM_D] Epoch   4/20 | train=0.376136 | val=0.064345 | IC=0.0185 | RankIC=0.0149 | DirAcc=0.502 | lr=2.84e-04 | gn=0.117 | 18.8s
+2026-05-02 16:47:21,090 [INFO]   [LSTM_D] batch 100/384 loss=0.377617 grad_norm=0.1307
+2026-05-02 16:47:23,833 [INFO]   [LSTM_D] batch 200/384 loss=0.376156 grad_norm=0.1307
+2026-05-02 16:47:26,571 [INFO]   [LSTM_D] batch 300/384 loss=0.380344 grad_norm=0.1310
+2026-05-02 16:47:37,116 [INFO] [LSTM_D] Epoch   5/20 | train=0.375486 | val=0.064343 | IC=0.0226 | RankIC=0.0192 | DirAcc=0.478 | lr=2.71e-04 | gn=0.132 | 19.0s
+2026-05-02 16:47:37,118 [INFO]   ★ New best IC=0.0226 | val_loss=0.064343
+2026-05-02 16:47:40,122 [INFO]   [LSTM_D] batch 100/384 loss=0.380486 grad_norm=0.1428
+2026-05-02 16:47:42,839 [INFO]   [LSTM_D] batch 200/384 loss=0.381769 grad_norm=0.1486
+2026-05-02 16:47:45,555 [INFO]   [LSTM_D] batch 300/384 loss=0.372923 grad_norm=0.1484
+2026-05-02 16:47:56,092 [INFO] [LSTM_D] Epoch   6/20 | train=0.374481 | val=0.064906 | IC=0.0222 | RankIC=0.0162 | DirAcc=0.504 | lr=2.56e-04 | gn=0.150 | 19.0s
+2026-05-02 16:47:59,121 [INFO]   [LSTM_D] batch 100/384 loss=0.373485 grad_norm=inf
+2026-05-02 16:48:01,828 [INFO]   [LSTM_D] batch 200/384 loss=0.375335 grad_norm=inf
+2026-05-02 16:48:04,550 [INFO]   [LSTM_D] batch 300/384 loss=0.380227 grad_norm=inf
+2026-05-02 16:48:14,971 [INFO] [LSTM_D] Epoch   7/20 | train=0.372998 | val=0.065326 | IC=0.0247 | RankIC=0.0220 | DirAcc=0.512 | lr=2.38e-04 | gn=inf | 18.9s
+2026-05-02 16:48:14,973 [INFO]   ★ New best IC=0.0247 | val_loss=0.065326
+2026-05-02 16:48:17,988 [INFO]   [LSTM_D] batch 100/384 loss=0.376710 grad_norm=inf
+2026-05-02 16:48:20,674 [INFO]   [LSTM_D] batch 200/384 loss=0.372007 grad_norm=inf
+2026-05-02 16:48:23,363 [INFO]   [LSTM_D] batch 300/384 loss=0.365357 grad_norm=inf
+2026-05-02 16:48:33,823 [INFO] [LSTM_D] Epoch   8/20 | train=0.370941 | val=0.066488 | IC=0.0195 | RankIC=0.0128 | DirAcc=0.473 | lr=2.18e-04 | gn=inf | 18.8s
+2026-05-02 16:48:36,811 [INFO]   [LSTM_D] batch 100/384 loss=0.380658 grad_norm=0.2961
+2026-05-02 16:48:39,504 [INFO]   [LSTM_D] batch 200/384 loss=0.368632 grad_norm=inf
+2026-05-02 16:48:42,223 [INFO]   [LSTM_D] batch 300/384 loss=0.369431 grad_norm=inf
+2026-05-02 16:48:52,774 [INFO] [LSTM_D] Epoch   9/20 | train=0.368124 | val=0.067208 | IC=0.0189 | RankIC=0.0185 | DirAcc=0.481 | lr=1.97e-04 | gn=inf | 19.0s
+2026-05-02 16:48:55,770 [INFO]   [LSTM_D] batch 100/384 loss=0.357761 grad_norm=inf
+2026-05-02 16:48:58,503 [INFO]   [LSTM_D] batch 200/384 loss=0.362880 grad_norm=inf
+2026-05-02 16:49:01,216 [INFO]   [LSTM_D] batch 300/384 loss=0.371515 grad_norm=inf
+2026-05-02 16:49:11,693 [INFO] [LSTM_D] Epoch  10/20 | train=0.364621 | val=0.067706 | IC=0.0206 | RankIC=0.0183 | DirAcc=0.503 | lr=1.74e-04 | gn=inf | 18.9s
+2026-05-02 16:49:14,702 [INFO]   [LSTM_D] batch 100/384 loss=0.369784 grad_norm=0.5047
+2026-05-02 16:49:17,438 [INFO]   [LSTM_D] batch 200/384 loss=0.376178 grad_norm=inf
+2026-05-02 16:49:20,159 [INFO]   [LSTM_D] batch 300/384 loss=0.356064 grad_norm=inf
+2026-05-02 16:49:30,601 [INFO] [LSTM_D] Epoch  11/20 | train=0.359679 | val=0.070740 | IC=0.0218 | RankIC=0.0203 | DirAcc=0.482 | lr=1.50e-04 | gn=inf | 18.9s
+2026-05-02 16:49:33,609 [INFO]   [LSTM_D] batch 100/384 loss=0.366836 grad_norm=inf
+2026-05-02 16:49:36,312 [INFO]   [LSTM_D] batch 200/384 loss=0.371409 grad_norm=inf
+2026-05-02 16:49:39,036 [INFO]   [LSTM_D] batch 300/384 loss=0.363763 grad_norm=inf
+2026-05-02 16:49:49,533 [INFO] [LSTM_D] Epoch  12/20 | train=0.354714 | val=0.070809 | IC=0.0242 | RankIC=0.0215 | DirAcc=0.495 | lr=1.27e-04 | gn=inf | 18.9s
+2026-05-02 16:49:49,534 [INFO]   Early stopping at epoch 12 (best IC=0.0247)
+2026-05-02 16:49:49,541 [INFO]   Training curve → results/wf_daily_only/window_0/LSTM_D_history.csv
+2026-05-02 16:49:49,544 [INFO]   [TFT_D] torch.compile() enabled
+2026-05-02 16:49:49,545 [INFO]   [TFT_D] lr=3.00e-04  wd=1.0e-05  grad_clip=1.0  warmup_steps=0  amp=True
+2026-05-02 16:49:49,545 [INFO] 
+============================================================
+2026-05-02 16:49:49,545 [INFO] Training TFT_D for 20 epochs
+2026-05-02 16:49:49,545 [INFO]   Train batches: 384, Val batches: 368
+2026-05-02 16:49:49,545 [INFO]   Parameters: 774,258
+2026-05-02 16:49:49,545 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 16:49:49,545 [INFO] ============================================================
+2026-05-02 16:49:57,406 [INFO]   [TFT_D] batch 100/384 loss=0.384011 grad_norm=1.6803
+2026-05-02 16:50:01,894 [INFO]   [TFT_D] batch 200/384 loss=0.372064 grad_norm=1.0723
+2026-05-02 16:50:06,425 [INFO]   [TFT_D] batch 300/384 loss=0.378191 grad_norm=0.8244
+2026-05-02 16:50:22,716 [INFO] [TFT_D] Epoch   1/20 | train=0.383249 | val=0.063705 | IC=0.0394 | RankIC=0.0222 | DirAcc=0.435 | lr=3.00e-04 | gn=0.705 | 33.2s
+2026-05-02 16:50:22,727 [INFO]   ★ New best IC=0.0394 | val_loss=0.063705
+2026-05-02 16:50:27,554 [INFO]   [TFT_D] batch 100/384 loss=0.376903 grad_norm=0.2783
+2026-05-02 16:50:32,012 [INFO]   [TFT_D] batch 200/384 loss=0.392615 grad_norm=0.2554
+2026-05-02 16:50:36,551 [INFO]   [TFT_D] batch 300/384 loss=0.377664 grad_norm=0.2391
+2026-05-02 16:50:48,895 [INFO] [TFT_D] Epoch   2/20 | train=0.377079 | val=0.064018 | IC=0.0380 | RankIC=0.0227 | DirAcc=0.550 | lr=2.98e-04 | gn=0.230 | 26.2s
+2026-05-02 16:50:53,771 [INFO]   [TFT_D] batch 100/384 loss=0.370601 grad_norm=0.1782
+2026-05-02 16:50:58,273 [INFO]   [TFT_D] batch 200/384 loss=0.376187 grad_norm=0.1809
+2026-05-02 16:51:02,839 [INFO]   [TFT_D] batch 300/384 loss=0.375447 grad_norm=0.1711
+2026-05-02 16:51:15,099 [INFO] [TFT_D] Epoch   3/20 | train=0.376157 | val=0.064096 | IC=0.0300 | RankIC=0.0163 | DirAcc=0.535 | lr=2.93e-04 | gn=0.167 | 26.2s
+2026-05-02 16:51:19,873 [INFO]   [TFT_D] batch 100/384 loss=0.382242 grad_norm=0.1581
+2026-05-02 16:51:24,244 [INFO]   [TFT_D] batch 200/384 loss=0.365965 grad_norm=0.1552
+2026-05-02 16:51:28,690 [INFO]   [TFT_D] batch 300/384 loss=0.364457 grad_norm=0.1501
+2026-05-02 16:51:41,149 [INFO] [TFT_D] Epoch   4/20 | train=0.375123 | val=0.064350 | IC=0.0326 | RankIC=0.0154 | DirAcc=0.446 | lr=2.84e-04 | gn=0.147 | 26.0s
+2026-05-02 16:51:45,982 [INFO]   [TFT_D] batch 100/384 loss=0.385468 grad_norm=0.1433
+2026-05-02 16:51:50,420 [INFO]   [TFT_D] batch 200/384 loss=0.370896 grad_norm=0.1370
+2026-05-02 16:51:54,771 [INFO]   [TFT_D] batch 300/384 loss=0.369917 grad_norm=0.1387
+2026-05-02 16:52:07,043 [INFO] [TFT_D] Epoch   5/20 | train=0.374073 | val=0.065216 | IC=0.0114 | RankIC=0.0135 | DirAcc=0.457 | lr=2.71e-04 | gn=0.139 | 25.9s
+2026-05-02 16:52:11,753 [INFO]   [TFT_D] batch 100/384 loss=0.380731 grad_norm=0.1486
+2026-05-02 16:52:16,239 [INFO]   [TFT_D] batch 200/384 loss=0.365133 grad_norm=0.1425
+2026-05-02 16:52:20,673 [INFO]   [TFT_D] batch 300/384 loss=0.367119 grad_norm=nan
+2026-05-02 16:52:32,901 [INFO] [TFT_D] Epoch   6/20 | train=0.372993 | val=0.064743 | IC=0.0217 | RankIC=0.0156 | DirAcc=0.512 | lr=2.56e-04 | gn=nan | 25.9s
+2026-05-02 16:52:32,901 [INFO]   Early stopping at epoch 6 (best IC=0.0394)
+2026-05-02 16:52:32,921 [INFO]   Training curve → results/wf_daily_only/window_0/TFT_D_history.csv
+2026-05-02 16:52:32,924 [INFO] 
+  Phase 3: Training meta model...
+2026-05-02 16:52:32,926 [WARNING]   No minute weights found — minute sub-models will be random init
+2026-05-02 16:52:32,926 [INFO] Collecting sub-model outputs for meta training...
+2026-05-02 16:52:32,926 [INFO] Sub-models frozen for meta training (2 models)
+2026-05-02 16:52:32,995 [INFO] Regime features built: 8318 dates, 8 features
+2026-05-02 16:52:56,656 [INFO]   Meta align: 49178 union keys | matched: lstm_d=49152, tft_d=49152
+2026-05-02 16:53:18,084 [INFO]   Meta align: 47043 union keys | matched: lstm_d=47043, tft_d=47043
+2026-05-02 16:53:18,259 [INFO]   Meta train: 49,178 | val: 47,043
+2026-05-02 16:53:18,264 [INFO] 
+============================================================
+2026-05-02 16:53:18,264 [INFO] Training MetaMLP for 10 epochs (18,659 params)
+2026-05-02 16:53:18,264 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 16:53:18,264 [INFO] ============================================================
+2026-05-02 16:53:19,522 [INFO] [Meta] Epoch   1/10 | train=0.006552 | val=0.006767 | IC=0.0170 | RankIC=0.0097 | DirAcc=0.503 | 1.3s
+2026-05-02 16:53:19,523 [INFO]   ★ New best meta IC=0.0170 | val=0.006767
+2026-05-02 16:53:20,736 [INFO] [Meta] Epoch   2/10 | train=0.006505 | val=0.006780 | IC=0.0185 | RankIC=0.0095 | DirAcc=0.481 | 1.2s
+2026-05-02 16:53:20,737 [INFO]   ★ New best meta IC=0.0185 | val=0.006780
+2026-05-02 16:53:21,983 [INFO] [Meta] Epoch   3/10 | train=0.006498 | val=0.006761 | IC=0.0244 | RankIC=0.0084 | DirAcc=0.487 | 1.2s
+2026-05-02 16:53:21,984 [INFO]   ★ New best meta IC=0.0244 | val=0.006761
+2026-05-02 16:53:23,225 [INFO] [Meta] Epoch   4/10 | train=0.006487 | val=0.006823 | IC=0.0296 | RankIC=0.0113 | DirAcc=0.444 | 1.2s
+2026-05-02 16:53:23,225 [INFO]   ★ New best meta IC=0.0296 | val=0.006823
+2026-05-02 16:53:24,436 [INFO] [Meta] Epoch   5/10 | train=0.006479 | val=0.006780 | IC=0.0281 | RankIC=0.0101 | DirAcc=0.480 | 1.2s
+2026-05-02 16:53:25,654 [INFO] [Meta] Epoch   6/10 | train=0.006478 | val=0.006751 | IC=0.0288 | RankIC=0.0099 | DirAcc=0.532 | 1.2s
+2026-05-02 16:53:26,897 [INFO] [Meta] Epoch   7/10 | train=0.006473 | val=0.006779 | IC=0.0283 | RankIC=0.0103 | DirAcc=0.447 | 1.2s
+2026-05-02 16:53:28,121 [INFO] [Meta] Epoch   8/10 | train=0.006471 | val=0.006759 | IC=0.0282 | RankIC=0.0094 | DirAcc=0.485 | 1.2s
+2026-05-02 16:53:29,364 [INFO] [Meta] Epoch   9/10 | train=0.006466 | val=0.006775 | IC=0.0286 | RankIC=0.0102 | DirAcc=0.489 | 1.2s
+2026-05-02 16:53:29,364 [INFO]   Early stopping at epoch 9 (best IC=0.0296)
+2026-05-02 16:53:29,366 [INFO]   Training curve → results/wf_daily_only/window_0/Meta_history.csv
+2026-05-02 16:53:29,366 [INFO] 
+  Evaluating on validation set for IC weighting...
+2026-05-02 16:53:45,360 [INFO] 
+  Evaluating on test window...
+2026-05-02 16:54:09,498 [INFO] 
+  Window 0 results:
+2026-05-02 16:54:09,498 [INFO]     Val IC=0.0296 (for ensemble weighting)
+2026-05-02 16:54:09,498 [INFO]     Test IC=0.0236, RankIC=0.0152, DirAcc=0.458
+2026-05-02 16:54:09,498 [INFO]     L/S Sharpe=1.0863, MaxDD=-0.1835
+2026-05-02 16:54:09,498 [INFO]     Time: 689s
+2026-05-02 16:54:09,510 [INFO] HierarchicalForecaster saved → results/wf_daily_only/window_0/fold_0_forecaster.pt
+2026-05-02 16:54:09,511 [INFO]   Saved fold model: results/wf_daily_only/window_0/fold_0_forecaster.pt
+2026-05-02 16:54:09,511 [INFO]   Computing attention prior from window 0 test set...
+2026-05-02 16:54:30,020 [INFO] Attention bias for window 0: {'lstm_d': 0.3894, 'tft_d': 0.4659, 'lstm_m': -0.2851, 'tft_m': -0.2851, 'news': -0.2851}
+2026-05-02 16:54:30,025 [INFO]   Attention prior updated for next window
+2026-05-02 16:54:30,025 [INFO] 
+######################################################################
+2026-05-02 16:54:30,025 [INFO] # WINDOW 1/5
+2026-05-02 16:54:30,025 [INFO] ######################################################################
+2026-05-02 16:57:31,323 [INFO]   Daily:  train=102073, val=75909, test=110069
+2026-05-02 16:57:31,330 [INFO]   Minute: train=0, val=0, test=0
+2026-05-02 16:57:31,333 [INFO]   Skipping sub-models: ['lstm_m', 'tft_m', 'news'] (use_minute=False, use_news=False)
+2026-05-02 16:57:31,521 [INFO] Hierarchical Forecaster parameter count:
+2026-05-02 16:57:31,521 [INFO]   lstm_d      :    256,529
+2026-05-02 16:57:31,521 [INFO]   tft_d       :    774,258
+2026-05-02 16:57:31,522 [INFO]   meta        :     18,659
+2026-05-02 16:57:31,522 [INFO]   TOTAL       :  1,049,446
+2026-05-02 16:57:31,597 [INFO]   Applying attention bias from window 0
+2026-05-02 16:57:31,599 [WARNING] Bias has 5 elements but forecaster has 2 sub-models. Truncating bias.
+2026-05-02 16:57:31,605 [INFO] MetaMLP attention bias applied: {'sub_0': 0.389, 'sub_1': 0.466}
+2026-05-02 16:57:31,608 [INFO] 
+  Phase 1: Training daily models...
+2026-05-02 16:57:31,652 [INFO]   [LSTM_D] torch.compile() enabled
+2026-05-02 16:57:31,657 [INFO]   [LSTM_D] lr=3.00e-04  wd=1.0e-04  grad_clip=1.0  warmup_steps=0  amp=True
+2026-05-02 16:57:31,786 [INFO] 
+============================================================
+2026-05-02 16:57:31,788 [INFO] Training LSTM_D for 20 epochs
+2026-05-02 16:57:31,788 [INFO]   Train batches: 797, Val batches: 594
+2026-05-02 16:57:31,788 [INFO]   Parameters: 256,529
+2026-05-02 16:57:31,788 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 16:57:31,788 [INFO] ============================================================
+2026-05-02 16:57:35,617 [INFO]   [LSTM_D] batch 100/797 loss=0.376356 grad_norm=0.4487
+2026-05-02 16:57:38,364 [INFO]   [LSTM_D] batch 200/797 loss=0.377647 grad_norm=0.3381
+2026-05-02 16:57:41,119 [INFO]   [LSTM_D] batch 300/797 loss=0.378379 grad_norm=0.2743
+2026-05-02 16:57:43,870 [INFO]   [LSTM_D] batch 400/797 loss=0.375823 grad_norm=0.2282
+2026-05-02 16:57:46,604 [INFO]   [LSTM_D] batch 500/797 loss=0.380839 grad_norm=0.1994
+2026-05-02 16:57:49,307 [INFO]   [LSTM_D] batch 600/797 loss=0.382480 grad_norm=0.1778
+2026-05-02 16:57:52,045 [INFO]   [LSTM_D] batch 700/797 loss=0.380011 grad_norm=0.1619
+2026-05-02 16:58:08,213 [INFO] [LSTM_D] Epoch   1/20 | train=0.378848 | val=0.068055 | IC=0.0235 | RankIC=0.0212 | DirAcc=0.476 | lr=3.00e-04 | gn=0.149 | 36.4s
+2026-05-02 16:58:08,220 [INFO]   ★ New best IC=0.0235 | val_loss=0.068055
+2026-05-02 16:58:11,339 [INFO]   [LSTM_D] batch 100/797 loss=0.376568 grad_norm=0.0584
+2026-05-02 16:58:14,125 [INFO]   [LSTM_D] batch 200/797 loss=0.373318 grad_norm=0.0583
+2026-05-02 16:58:16,841 [INFO]   [LSTM_D] batch 300/797 loss=0.377526 grad_norm=0.0573
+2026-05-02 16:58:19,581 [INFO]   [LSTM_D] batch 400/797 loss=0.377722 grad_norm=0.0572
+2026-05-02 16:58:22,330 [INFO]   [LSTM_D] batch 500/797 loss=0.380846 grad_norm=0.0567
+2026-05-02 16:58:25,046 [INFO]   [LSTM_D] batch 600/797 loss=0.376992 grad_norm=0.0562
+2026-05-02 16:58:27,776 [INFO]   [LSTM_D] batch 700/797 loss=0.387374 grad_norm=0.0560
+2026-05-02 16:58:43,758 [INFO] [LSTM_D] Epoch   2/20 | train=0.377710 | val=0.068407 | IC=0.0262 | RankIC=0.0239 | DirAcc=0.448 | lr=2.98e-04 | gn=0.056 | 35.5s
+2026-05-02 16:58:43,761 [INFO]   ★ New best IC=0.0262 | val_loss=0.068407
+2026-05-02 16:58:46,905 [INFO]   [LSTM_D] batch 100/797 loss=0.374172 grad_norm=0.0574
+2026-05-02 16:58:49,671 [INFO]   [LSTM_D] batch 200/797 loss=0.376301 grad_norm=0.0598
+2026-05-02 16:58:52,410 [INFO]   [LSTM_D] batch 300/797 loss=0.383404 grad_norm=0.0577
+2026-05-02 16:58:55,128 [INFO]   [LSTM_D] batch 400/797 loss=0.381498 grad_norm=0.0574
+2026-05-02 16:58:57,827 [INFO]   [LSTM_D] batch 500/797 loss=0.387041 grad_norm=0.0556
+2026-05-02 16:59:00,539 [INFO]   [LSTM_D] batch 600/797 loss=0.375477 grad_norm=0.0551
+2026-05-02 16:59:03,290 [INFO]   [LSTM_D] batch 700/797 loss=0.373380 grad_norm=0.0545
+2026-05-02 16:59:19,199 [INFO] [LSTM_D] Epoch   3/20 | train=0.377448 | val=0.068069 | IC=0.0276 | RankIC=0.0247 | DirAcc=0.489 | lr=2.93e-04 | gn=0.054 | 35.4s
+2026-05-02 16:59:19,202 [INFO]   ★ New best IC=0.0276 | val_loss=0.068069
+2026-05-02 16:59:22,327 [INFO]   [LSTM_D] batch 100/797 loss=0.379250 grad_norm=0.0478
+2026-05-02 16:59:25,127 [INFO]   [LSTM_D] batch 200/797 loss=0.378457 grad_norm=inf
+2026-05-02 16:59:27,897 [INFO]   [LSTM_D] batch 300/797 loss=0.371079 grad_norm=inf
+2026-05-02 16:59:30,643 [INFO]   [LSTM_D] batch 400/797 loss=0.377914 grad_norm=inf
+2026-05-02 16:59:33,390 [INFO]   [LSTM_D] batch 500/797 loss=0.374391 grad_norm=inf
+2026-05-02 16:59:36,117 [INFO]   [LSTM_D] batch 600/797 loss=0.377696 grad_norm=inf
+2026-05-02 16:59:38,850 [INFO]   [LSTM_D] batch 700/797 loss=0.376896 grad_norm=inf
+2026-05-02 16:59:54,770 [INFO] [LSTM_D] Epoch   4/20 | train=0.377228 | val=0.068014 | IC=0.0318 | RankIC=0.0290 | DirAcc=0.519 | lr=2.84e-04 | gn=inf | 35.6s
+2026-05-02 16:59:54,772 [INFO]   ★ New best IC=0.0318 | val_loss=0.068014
+2026-05-02 16:59:57,871 [INFO]   [LSTM_D] batch 100/797 loss=0.371836 grad_norm=inf
+2026-05-02 17:00:00,607 [INFO]   [LSTM_D] batch 200/797 loss=0.374471 grad_norm=inf
+2026-05-02 17:00:03,367 [INFO]   [LSTM_D] batch 300/797 loss=0.380478 grad_norm=inf
+2026-05-02 17:00:06,108 [INFO]   [LSTM_D] batch 400/797 loss=0.376323 grad_norm=inf
+2026-05-02 17:00:08,837 [INFO]   [LSTM_D] batch 500/797 loss=0.379627 grad_norm=inf
+2026-05-02 17:00:11,589 [INFO]   [LSTM_D] batch 600/797 loss=0.372865 grad_norm=inf
+2026-05-02 17:00:14,340 [INFO]   [LSTM_D] batch 700/797 loss=0.377950 grad_norm=inf
+2026-05-02 17:00:30,245 [INFO] [LSTM_D] Epoch   5/20 | train=0.376947 | val=0.068271 | IC=0.0233 | RankIC=0.0149 | DirAcc=0.488 | lr=2.71e-04 | gn=inf | 35.5s
+2026-05-02 17:00:33,315 [INFO]   [LSTM_D] batch 100/797 loss=0.373714 grad_norm=0.0617
+2026-05-02 17:00:36,054 [INFO]   [LSTM_D] batch 200/797 loss=0.376005 grad_norm=inf
+2026-05-02 17:00:38,802 [INFO]   [LSTM_D] batch 300/797 loss=0.375293 grad_norm=inf
+2026-05-02 17:00:41,548 [INFO]   [LSTM_D] batch 400/797 loss=0.372238 grad_norm=inf
+2026-05-02 17:00:44,271 [INFO]   [LSTM_D] batch 500/797 loss=0.375846 grad_norm=inf
+2026-05-02 17:00:46,999 [INFO]   [LSTM_D] batch 600/797 loss=0.386134 grad_norm=inf
+2026-05-02 17:00:49,753 [INFO]   [LSTM_D] batch 700/797 loss=0.372043 grad_norm=inf
+2026-05-02 17:01:05,635 [INFO] [LSTM_D] Epoch   6/20 | train=0.376667 | val=0.068380 | IC=0.0271 | RankIC=0.0236 | DirAcc=0.503 | lr=2.56e-04 | gn=inf | 35.4s
+2026-05-02 17:01:08,712 [INFO]   [LSTM_D] batch 100/797 loss=0.379730 grad_norm=0.0640
+2026-05-02 17:01:11,444 [INFO]   [LSTM_D] batch 200/797 loss=0.374130 grad_norm=inf
+2026-05-02 17:01:14,166 [INFO]   [LSTM_D] batch 300/797 loss=0.371137 grad_norm=inf
+2026-05-02 17:01:16,865 [INFO]   [LSTM_D] batch 400/797 loss=0.379490 grad_norm=inf
+2026-05-02 17:01:19,574 [INFO]   [LSTM_D] batch 500/797 loss=0.376523 grad_norm=inf
+2026-05-02 17:01:22,292 [INFO]   [LSTM_D] batch 600/797 loss=0.384202 grad_norm=inf
+2026-05-02 17:01:24,988 [INFO]   [LSTM_D] batch 700/797 loss=0.380964 grad_norm=inf
+2026-05-02 17:01:40,970 [INFO] [LSTM_D] Epoch   7/20 | train=0.376228 | val=0.068402 | IC=0.0269 | RankIC=0.0250 | DirAcc=0.503 | lr=2.38e-04 | gn=inf | 35.3s
+2026-05-02 17:01:44,079 [INFO]   [LSTM_D] batch 100/797 loss=0.375615 grad_norm=inf
+2026-05-02 17:01:46,806 [INFO]   [LSTM_D] batch 200/797 loss=0.384461 grad_norm=inf
+2026-05-02 17:01:49,520 [INFO]   [LSTM_D] batch 300/797 loss=0.374031 grad_norm=inf
+2026-05-02 17:01:52,210 [INFO]   [LSTM_D] batch 400/797 loss=0.374439 grad_norm=inf
+2026-05-02 17:01:54,917 [INFO]   [LSTM_D] batch 500/797 loss=0.373692 grad_norm=inf
+2026-05-02 17:01:57,629 [INFO]   [LSTM_D] batch 600/797 loss=0.371664 grad_norm=inf
+2026-05-02 17:02:00,340 [INFO]   [LSTM_D] batch 700/797 loss=0.378105 grad_norm=inf
+2026-05-02 17:02:16,209 [INFO] [LSTM_D] Epoch   8/20 | train=0.375816 | val=0.068458 | IC=0.0215 | RankIC=0.0181 | DirAcc=0.518 | lr=2.18e-04 | gn=inf | 35.2s
+2026-05-02 17:02:19,329 [INFO]   [LSTM_D] batch 100/797 loss=0.383098 grad_norm=inf
+2026-05-02 17:02:22,138 [INFO]   [LSTM_D] batch 200/797 loss=0.369141 grad_norm=inf
+2026-05-02 17:02:24,896 [INFO]   [LSTM_D] batch 300/797 loss=0.376206 grad_norm=inf
+2026-05-02 17:02:27,632 [INFO]   [LSTM_D] batch 400/797 loss=0.378508 grad_norm=inf
+2026-05-02 17:02:30,371 [INFO]   [LSTM_D] batch 500/797 loss=0.378650 grad_norm=inf
+2026-05-02 17:02:33,077 [INFO]   [LSTM_D] batch 600/797 loss=0.383211 grad_norm=inf
+2026-05-02 17:02:35,845 [INFO]   [LSTM_D] batch 700/797 loss=0.381282 grad_norm=inf
+2026-05-02 17:02:51,813 [INFO] [LSTM_D] Epoch   9/20 | train=0.375070 | val=0.068911 | IC=0.0204 | RankIC=0.0191 | DirAcc=0.523 | lr=1.97e-04 | gn=inf | 35.6s
+2026-05-02 17:02:51,813 [INFO]   Early stopping at epoch 9 (best IC=0.0318)
+2026-05-02 17:02:51,821 [INFO]   Training curve → results/wf_daily_only/window_1/LSTM_D_history.csv
+2026-05-02 17:02:51,824 [INFO]   [TFT_D] torch.compile() enabled
+2026-05-02 17:02:51,825 [INFO]   [TFT_D] lr=3.00e-04  wd=1.0e-05  grad_clip=1.0  warmup_steps=0  amp=True
+2026-05-02 17:02:51,825 [INFO] 
+============================================================
+2026-05-02 17:02:51,825 [INFO] Training TFT_D for 20 epochs
+2026-05-02 17:02:51,825 [INFO]   Train batches: 797, Val batches: 594
+2026-05-02 17:02:51,825 [INFO]   Parameters: 774,258
+2026-05-02 17:02:51,825 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 17:02:51,825 [INFO] ============================================================
+2026-05-02 17:02:56,767 [INFO]   [TFT_D] batch 100/797 loss=0.377070 grad_norm=1.3930
+2026-05-02 17:03:01,300 [INFO]   [TFT_D] batch 200/797 loss=0.378397 grad_norm=0.8812
+2026-05-02 17:03:05,829 [INFO]   [TFT_D] batch 300/797 loss=0.383140 grad_norm=0.6915
+2026-05-02 17:03:10,410 [INFO]   [TFT_D] batch 400/797 loss=0.381973 grad_norm=0.5793
+2026-05-02 17:03:14,963 [INFO]   [TFT_D] batch 500/797 loss=0.374856 grad_norm=0.5112
+2026-05-02 17:03:19,408 [INFO]   [TFT_D] batch 600/797 loss=0.378663 grad_norm=0.4608
+2026-05-02 17:03:23,909 [INFO]   [TFT_D] batch 700/797 loss=0.375960 grad_norm=0.4201
+2026-05-02 17:03:41,657 [INFO] [TFT_D] Epoch   1/20 | train=0.381519 | val=0.068225 | IC=0.0160 | RankIC=0.0148 | DirAcc=0.433 | lr=3.00e-04 | gn=0.391 | 49.8s
+2026-05-02 17:03:41,670 [INFO]   ★ New best IC=0.0160 | val_loss=0.068225
+2026-05-02 17:03:46,485 [INFO]   [TFT_D] batch 100/797 loss=0.378243 grad_norm=0.1613
+2026-05-02 17:03:50,990 [INFO]   [TFT_D] batch 200/797 loss=0.376095 grad_norm=0.1555
+2026-05-02 17:03:55,380 [INFO]   [TFT_D] batch 300/797 loss=0.376540 grad_norm=0.1521
+2026-05-02 17:03:59,948 [INFO]   [TFT_D] batch 400/797 loss=0.382647 grad_norm=0.1488
+2026-05-02 17:04:04,308 [INFO]   [TFT_D] batch 500/797 loss=0.379381 grad_norm=0.1464
+2026-05-02 17:04:08,822 [INFO]   [TFT_D] batch 600/797 loss=0.387010 grad_norm=0.1447
+2026-05-02 17:04:13,228 [INFO]   [TFT_D] batch 700/797 loss=0.378022 grad_norm=0.1434
+2026-05-02 17:04:30,759 [INFO] [TFT_D] Epoch   2/20 | train=0.377705 | val=0.068129 | IC=0.0074 | RankIC=0.0136 | DirAcc=0.483 | lr=2.98e-04 | gn=0.141 | 49.1s
+2026-05-02 17:04:35,649 [INFO]   [TFT_D] batch 100/797 loss=0.367671 grad_norm=0.1366
+2026-05-02 17:04:40,093 [INFO]   [TFT_D] batch 200/797 loss=0.371812 grad_norm=0.1330
+2026-05-02 17:04:44,619 [INFO]   [TFT_D] batch 300/797 loss=0.371458 grad_norm=0.1302
+2026-05-02 17:04:49,060 [INFO]   [TFT_D] batch 400/797 loss=0.379197 grad_norm=0.1270
+2026-05-02 17:04:53,553 [INFO]   [TFT_D] batch 500/797 loss=0.382936 grad_norm=0.1246
+2026-05-02 17:04:58,121 [INFO]   [TFT_D] batch 600/797 loss=0.371347 grad_norm=0.1212
+2026-05-02 17:05:02,688 [INFO]   [TFT_D] batch 700/797 loss=0.373145 grad_norm=0.1180
+2026-05-02 17:05:20,462 [INFO] [TFT_D] Epoch   3/20 | train=0.377189 | val=0.068067 | IC=0.0126 | RankIC=0.0161 | DirAcc=0.528 | lr=2.93e-04 | gn=inf | 49.7s
+2026-05-02 17:05:25,243 [INFO]   [TFT_D] batch 100/797 loss=0.374621 grad_norm=nan
+2026-05-02 17:05:29,684 [INFO]   [TFT_D] batch 200/797 loss=0.385967 grad_norm=nan
+2026-05-02 17:05:34,154 [INFO]   [TFT_D] batch 300/797 loss=0.375443 grad_norm=nan
+2026-05-02 17:05:38,510 [INFO]   [TFT_D] batch 400/797 loss=0.367198 grad_norm=nan
+2026-05-02 17:05:42,938 [INFO]   [TFT_D] batch 500/797 loss=0.380110 grad_norm=nan
+2026-05-02 17:05:47,500 [INFO]   [TFT_D] batch 600/797 loss=0.376493 grad_norm=nan
+2026-05-02 17:05:51,910 [INFO]   [TFT_D] batch 700/797 loss=0.381313 grad_norm=nan
+2026-05-02 17:06:09,527 [INFO] [TFT_D] Epoch   4/20 | train=0.376723 | val=0.068455 | IC=0.0107 | RankIC=0.0128 | DirAcc=0.459 | lr=2.84e-04 | gn=nan | 49.1s
+2026-05-02 17:06:14,369 [INFO]   [TFT_D] batch 100/797 loss=0.378580 grad_norm=0.0959
+2026-05-02 17:06:18,834 [INFO]   [TFT_D] batch 200/797 loss=0.370623 grad_norm=nan
+2026-05-02 17:06:23,381 [INFO]   [TFT_D] batch 300/797 loss=0.378928 grad_norm=nan
+2026-05-02 17:06:27,904 [INFO]   [TFT_D] batch 400/797 loss=0.376131 grad_norm=nan
+2026-05-02 17:06:32,380 [INFO]   [TFT_D] batch 500/797 loss=0.375656 grad_norm=nan
+2026-05-02 17:06:36,902 [INFO]   [TFT_D] batch 600/797 loss=0.374138 grad_norm=nan
+2026-05-02 17:06:41,355 [INFO]   [TFT_D] batch 700/797 loss=0.376236 grad_norm=nan
+2026-05-02 17:06:59,284 [INFO] [TFT_D] Epoch   5/20 | train=0.376043 | val=0.068902 | IC=0.0082 | RankIC=0.0124 | DirAcc=0.521 | lr=2.71e-04 | gn=nan | 49.8s
+2026-05-02 17:07:04,152 [INFO]   [TFT_D] batch 100/797 loss=0.375921 grad_norm=nan
+2026-05-02 17:07:08,664 [INFO]   [TFT_D] batch 200/797 loss=0.369378 grad_norm=nan
+2026-05-02 17:07:13,229 [INFO]   [TFT_D] batch 300/797 loss=0.379439 grad_norm=nan
+2026-05-02 17:07:17,681 [INFO]   [TFT_D] batch 400/797 loss=0.380352 grad_norm=nan
+2026-05-02 17:07:22,131 [INFO]   [TFT_D] batch 500/797 loss=0.371747 grad_norm=nan
+2026-05-02 17:07:26,541 [INFO]   [TFT_D] batch 600/797 loss=0.372074 grad_norm=nan
+2026-05-02 17:07:31,040 [INFO]   [TFT_D] batch 700/797 loss=0.380315 grad_norm=nan
+2026-05-02 17:07:48,930 [INFO] [TFT_D] Epoch   6/20 | train=0.375508 | val=0.068618 | IC=0.0092 | RankIC=0.0136 | DirAcc=0.537 | lr=2.56e-04 | gn=nan | 49.6s
+2026-05-02 17:07:48,930 [INFO]   Early stopping at epoch 6 (best IC=0.0160)
+2026-05-02 17:07:48,957 [INFO]   Training curve → results/wf_daily_only/window_1/TFT_D_history.csv
+2026-05-02 17:07:48,959 [INFO] 
+  Phase 3: Training meta model...
+2026-05-02 17:07:48,961 [WARNING]   No minute weights found — minute sub-models will be random init
+2026-05-02 17:07:48,964 [INFO] Collecting sub-model outputs for meta training...
+2026-05-02 17:07:48,964 [INFO] Sub-models frozen for meta training (2 models)
+2026-05-02 17:08:39,252 [INFO]   Meta align: 102073 union keys | matched: lstm_d=102016, tft_d=102016
+2026-05-02 17:09:12,837 [INFO]   Meta align: 75909 union keys | matched: lstm_d=75909, tft_d=75909
+2026-05-02 17:09:13,181 [INFO]   Meta train: 102,073 | val: 75,909
+2026-05-02 17:09:13,181 [INFO] 
+============================================================
+2026-05-02 17:09:13,181 [INFO] Training MetaMLP for 10 epochs (18,659 params)
+2026-05-02 17:09:13,181 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 17:09:13,181 [INFO] ============================================================
+2026-05-02 17:09:15,621 [INFO] [Meta] Epoch   1/10 | train=0.006640 | val=0.007188 | IC=-0.0001 | RankIC=-0.0020 | DirAcc=0.504 | 2.4s
+2026-05-02 17:09:15,622 [INFO]   ★ New best meta IC=-0.0001 | val=0.007188
+2026-05-02 17:09:18,041 [INFO] [Meta] Epoch   2/10 | train=0.006599 | val=0.007172 | IC=0.0292 | RankIC=0.0273 | DirAcc=0.459 | 2.4s
+2026-05-02 17:09:18,042 [INFO]   ★ New best meta IC=0.0292 | val=0.007172
+2026-05-02 17:09:20,403 [INFO] [Meta] Epoch   3/10 | train=0.006593 | val=0.007170 | IC=0.0118 | RankIC=0.0095 | DirAcc=0.512 | 2.4s
+2026-05-02 17:09:22,747 [INFO] [Meta] Epoch   4/10 | train=0.006590 | val=0.007168 | IC=0.0263 | RankIC=0.0261 | DirAcc=0.503 | 2.3s
+2026-05-02 17:09:25,167 [INFO] [Meta] Epoch   5/10 | train=0.006589 | val=0.007168 | IC=0.0277 | RankIC=0.0289 | DirAcc=0.542 | 2.4s
+2026-05-02 17:09:27,587 [INFO] [Meta] Epoch   6/10 | train=0.006589 | val=0.007168 | IC=0.0279 | RankIC=0.0293 | DirAcc=0.532 | 2.4s
+2026-05-02 17:09:30,029 [INFO] [Meta] Epoch   7/10 | train=0.006588 | val=0.007168 | IC=0.0260 | RankIC=0.0276 | DirAcc=0.486 | 2.4s
+2026-05-02 17:09:30,029 [INFO]   Early stopping at epoch 7 (best IC=0.0292)
+2026-05-02 17:09:30,031 [INFO]   Training curve → results/wf_daily_only/window_1/Meta_history.csv
+2026-05-02 17:09:30,032 [INFO] 
+  Evaluating on validation set for IC weighting...
+2026-05-02 17:09:54,868 [INFO] 
+  Evaluating on test window...
+2026-05-02 17:10:31,457 [INFO] 
+  Window 1 results:
+2026-05-02 17:10:31,457 [INFO]     Val IC=0.0292 (for ensemble weighting)
+2026-05-02 17:10:31,457 [INFO]     Test IC=0.0131, RankIC=0.0107, DirAcc=0.493
+2026-05-02 17:10:31,457 [INFO]     L/S Sharpe=1.5002, MaxDD=-0.1245
+2026-05-02 17:10:31,457 [INFO]     Time: 961s
+2026-05-02 17:10:31,470 [INFO] HierarchicalForecaster saved → results/wf_daily_only/window_1/fold_1_forecaster.pt
+2026-05-02 17:10:31,471 [INFO]   Saved fold model: results/wf_daily_only/window_1/fold_1_forecaster.pt
+2026-05-02 17:10:31,471 [INFO]   Computing attention prior from window 1 test set...
+2026-05-02 17:11:02,546 [INFO] Attention bias for window 1: {'lstm_d': 0.3761, 'tft_d': 0.4771, 'lstm_m': -0.2844, 'tft_m': -0.2844, 'news': -0.2844}
+2026-05-02 17:11:02,546 [INFO]   Attention prior updated for next window
+2026-05-02 17:11:02,547 [INFO] 
+######################################################################
+2026-05-02 17:11:02,547 [INFO] # WINDOW 2/5
+2026-05-02 17:11:02,547 [INFO] ######################################################################
+2026-05-02 17:14:08,306 [INFO]   Daily:  train=186930, val=114101, test=160145
+2026-05-02 17:14:08,312 [INFO]   Minute: train=0, val=0, test=0
+2026-05-02 17:14:08,314 [INFO]   Skipping sub-models: ['lstm_m', 'tft_m', 'news'] (use_minute=False, use_news=False)
+2026-05-02 17:14:08,490 [INFO] Hierarchical Forecaster parameter count:
+2026-05-02 17:14:08,491 [INFO]   lstm_d      :    256,529
+2026-05-02 17:14:08,491 [INFO]   tft_d       :    774,258
+2026-05-02 17:14:08,491 [INFO]   meta        :     18,659
+2026-05-02 17:14:08,491 [INFO]   TOTAL       :  1,049,446
+2026-05-02 17:14:08,557 [INFO]   Applying attention bias from window 1
+2026-05-02 17:14:08,559 [WARNING] Bias has 5 elements but forecaster has 2 sub-models. Truncating bias.
+2026-05-02 17:14:08,564 [INFO] MetaMLP attention bias applied: {'sub_0': 0.376, 'sub_1': 0.477}
+2026-05-02 17:14:08,567 [INFO] 
+  Phase 1: Training daily models...
+2026-05-02 17:14:08,607 [INFO]   [LSTM_D] torch.compile() enabled
+2026-05-02 17:14:08,612 [INFO]   [LSTM_D] lr=3.00e-04  wd=1.0e-04  grad_clip=1.0  warmup_steps=0  amp=True
+2026-05-02 17:14:08,720 [INFO] 
+============================================================
+2026-05-02 17:14:08,722 [INFO] Training LSTM_D for 20 epochs
+2026-05-02 17:14:08,722 [INFO]   Train batches: 1460, Val batches: 892
+2026-05-02 17:14:08,722 [INFO]   Parameters: 256,529
+2026-05-02 17:14:08,722 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 17:14:08,722 [INFO] ============================================================
+2026-05-02 17:14:12,854 [INFO]   [LSTM_D] batch 100/1460 loss=0.383794 grad_norm=0.5097
+2026-05-02 17:14:15,530 [INFO]   [LSTM_D] batch 200/1460 loss=0.381524 grad_norm=0.3767
+2026-05-02 17:14:18,206 [INFO]   [LSTM_D] batch 300/1460 loss=0.371886 grad_norm=0.2963
+2026-05-02 17:14:20,900 [INFO]   [LSTM_D] batch 400/1460 loss=0.382839 grad_norm=0.2489
+2026-05-02 17:14:23,590 [INFO]   [LSTM_D] batch 500/1460 loss=0.379672 grad_norm=0.2156
+2026-05-02 17:14:26,277 [INFO]   [LSTM_D] batch 600/1460 loss=0.376788 grad_norm=0.1930
+2026-05-02 17:14:28,964 [INFO]   [LSTM_D] batch 700/1460 loss=0.380107 grad_norm=0.1748
+2026-05-02 17:14:31,617 [INFO]   [LSTM_D] batch 800/1460 loss=0.377414 grad_norm=0.1607
+2026-05-02 17:14:34,272 [INFO]   [LSTM_D] batch 900/1460 loss=0.373940 grad_norm=0.1496
+2026-05-02 17:14:36,917 [INFO]   [LSTM_D] batch 1000/1460 loss=0.385104 grad_norm=0.1401
+2026-05-02 17:14:39,580 [INFO]   [LSTM_D] batch 1100/1460 loss=0.384782 grad_norm=0.1316
+2026-05-02 17:14:42,243 [INFO]   [LSTM_D] batch 1200/1460 loss=0.379010 grad_norm=0.1246
+2026-05-02 17:14:44,886 [INFO]   [LSTM_D] batch 1300/1460 loss=0.377906 grad_norm=0.1186
+2026-05-02 17:14:47,531 [INFO]   [LSTM_D] batch 1400/1460 loss=0.375500 grad_norm=0.1136
+2026-05-02 17:15:08,816 [INFO] [LSTM_D] Epoch   1/20 | train=0.379653 | val=0.064058 | IC=0.0119 | RankIC=0.0100 | DirAcc=0.502 | lr=3.00e-04 | gn=0.111 | 60.1s
+2026-05-02 17:15:08,824 [INFO]   ★ New best IC=0.0119 | val_loss=0.064058
+2026-05-02 17:15:11,930 [INFO]   [LSTM_D] batch 100/1460 loss=0.374249 grad_norm=0.0486
+2026-05-02 17:15:14,661 [INFO]   [LSTM_D] batch 200/1460 loss=0.379956 grad_norm=0.0472
+2026-05-02 17:15:17,317 [INFO]   [LSTM_D] batch 300/1460 loss=0.384249 grad_norm=0.0469
+2026-05-02 17:15:19,971 [INFO]   [LSTM_D] batch 400/1460 loss=0.384876 grad_norm=0.0454
+2026-05-02 17:15:22,616 [INFO]   [LSTM_D] batch 500/1460 loss=0.379670 grad_norm=0.0448
+2026-05-02 17:15:25,293 [INFO]   [LSTM_D] batch 600/1460 loss=0.378496 grad_norm=0.0443
+2026-05-02 17:15:28,046 [INFO]   [LSTM_D] batch 700/1460 loss=0.380029 grad_norm=0.0438
+2026-05-02 17:15:30,753 [INFO]   [LSTM_D] batch 800/1460 loss=0.374076 grad_norm=0.0434
+2026-05-02 17:15:33,476 [INFO]   [LSTM_D] batch 900/1460 loss=0.381702 grad_norm=0.0431
+2026-05-02 17:15:36,171 [INFO]   [LSTM_D] batch 1000/1460 loss=0.375246 grad_norm=0.0427
+2026-05-02 17:15:38,859 [INFO]   [LSTM_D] batch 1100/1460 loss=0.381974 grad_norm=inf
+2026-05-02 17:15:41,568 [INFO]   [LSTM_D] batch 1200/1460 loss=0.375143 grad_norm=inf
+2026-05-02 17:15:44,250 [INFO]   [LSTM_D] batch 1300/1460 loss=0.382147 grad_norm=inf
+2026-05-02 17:15:46,926 [INFO]   [LSTM_D] batch 1400/1460 loss=0.379861 grad_norm=inf
+2026-05-02 17:16:07,885 [INFO] [LSTM_D] Epoch   2/20 | train=0.378729 | val=0.063970 | IC=0.0222 | RankIC=0.0253 | DirAcc=0.503 | lr=2.98e-04 | gn=inf | 59.1s
+2026-05-02 17:16:07,887 [INFO]   ★ New best IC=0.0222 | val_loss=0.063970
+2026-05-02 17:16:10,970 [INFO]   [LSTM_D] batch 100/1460 loss=0.376938 grad_norm=0.0371
+2026-05-02 17:16:13,658 [INFO]   [LSTM_D] batch 200/1460 loss=0.381679 grad_norm=inf
+2026-05-02 17:16:16,306 [INFO]   [LSTM_D] batch 300/1460 loss=0.376533 grad_norm=inf
+2026-05-02 17:16:18,961 [INFO]   [LSTM_D] batch 400/1460 loss=0.381438 grad_norm=inf
+2026-05-02 17:16:21,619 [INFO]   [LSTM_D] batch 500/1460 loss=0.375301 grad_norm=inf
+2026-05-02 17:16:24,305 [INFO]   [LSTM_D] batch 600/1460 loss=0.373202 grad_norm=inf
+2026-05-02 17:16:26,989 [INFO]   [LSTM_D] batch 700/1460 loss=0.381003 grad_norm=inf
+2026-05-02 17:16:29,660 [INFO]   [LSTM_D] batch 800/1460 loss=0.376819 grad_norm=inf
+2026-05-02 17:16:32,343 [INFO]   [LSTM_D] batch 900/1460 loss=0.376841 grad_norm=inf
+2026-05-02 17:16:34,960 [INFO]   [LSTM_D] batch 1000/1460 loss=0.381120 grad_norm=inf
+2026-05-02 17:16:37,625 [INFO]   [LSTM_D] batch 1100/1460 loss=0.375412 grad_norm=inf
+2026-05-02 17:16:40,319 [INFO]   [LSTM_D] batch 1200/1460 loss=0.377407 grad_norm=inf
+2026-05-02 17:16:43,025 [INFO]   [LSTM_D] batch 1300/1460 loss=0.379136 grad_norm=inf
+2026-05-02 17:16:45,685 [INFO]   [LSTM_D] batch 1400/1460 loss=0.378215 grad_norm=inf
+2026-05-02 17:17:06,677 [INFO] [LSTM_D] Epoch   3/20 | train=0.378559 | val=0.064194 | IC=0.0194 | RankIC=0.0228 | DirAcc=0.514 | lr=2.93e-04 | gn=inf | 58.8s
+2026-05-02 17:17:09,756 [INFO]   [LSTM_D] batch 100/1460 loss=0.379648 grad_norm=inf
+2026-05-02 17:17:12,428 [INFO]   [LSTM_D] batch 200/1460 loss=0.379045 grad_norm=inf
+2026-05-02 17:17:15,114 [INFO]   [LSTM_D] batch 300/1460 loss=0.378955 grad_norm=inf
+2026-05-02 17:17:17,791 [INFO]   [LSTM_D] batch 400/1460 loss=0.377173 grad_norm=inf
+2026-05-02 17:17:20,425 [INFO]   [LSTM_D] batch 500/1460 loss=0.376610 grad_norm=inf
+2026-05-02 17:17:23,056 [INFO]   [LSTM_D] batch 600/1460 loss=0.381714 grad_norm=inf
+2026-05-02 17:17:25,692 [INFO]   [LSTM_D] batch 700/1460 loss=0.381276 grad_norm=inf
+2026-05-02 17:17:28,378 [INFO]   [LSTM_D] batch 800/1460 loss=0.378938 grad_norm=inf
+2026-05-02 17:17:31,103 [INFO]   [LSTM_D] batch 900/1460 loss=0.382024 grad_norm=inf
+2026-05-02 17:17:33,830 [INFO]   [LSTM_D] batch 1000/1460 loss=0.377767 grad_norm=inf
+2026-05-02 17:17:36,535 [INFO]   [LSTM_D] batch 1100/1460 loss=0.382174 grad_norm=inf
+2026-05-02 17:17:39,237 [INFO]   [LSTM_D] batch 1200/1460 loss=0.378502 grad_norm=inf
+2026-05-02 17:17:41,887 [INFO]   [LSTM_D] batch 1300/1460 loss=0.370620 grad_norm=inf
+2026-05-02 17:17:44,521 [INFO]   [LSTM_D] batch 1400/1460 loss=0.383900 grad_norm=inf
+2026-05-02 17:18:05,389 [INFO] [LSTM_D] Epoch   4/20 | train=0.378405 | val=0.064018 | IC=0.0301 | RankIC=0.0327 | DirAcc=0.513 | lr=2.84e-04 | gn=inf | 58.7s
+2026-05-02 17:18:05,391 [INFO]   ★ New best IC=0.0301 | val_loss=0.064018
+2026-05-02 17:18:08,426 [INFO]   [LSTM_D] batch 100/1460 loss=0.382653 grad_norm=0.0368
+2026-05-02 17:18:11,070 [INFO]   [LSTM_D] batch 200/1460 loss=0.381405 grad_norm=inf
+2026-05-02 17:18:13,742 [INFO]   [LSTM_D] batch 300/1460 loss=0.380130 grad_norm=inf
+2026-05-02 17:18:16,376 [INFO]   [LSTM_D] batch 400/1460 loss=0.380188 grad_norm=inf
+2026-05-02 17:18:19,031 [INFO]   [LSTM_D] batch 500/1460 loss=0.381509 grad_norm=inf
+2026-05-02 17:18:21,695 [INFO]   [LSTM_D] batch 600/1460 loss=0.380439 grad_norm=inf
+2026-05-02 17:18:24,354 [INFO]   [LSTM_D] batch 700/1460 loss=0.373028 grad_norm=inf
+2026-05-02 17:18:27,032 [INFO]   [LSTM_D] batch 800/1460 loss=0.377581 grad_norm=inf
+2026-05-02 17:18:29,672 [INFO]   [LSTM_D] batch 900/1460 loss=0.376385 grad_norm=inf
+2026-05-02 17:18:32,305 [INFO]   [LSTM_D] batch 1000/1460 loss=0.383626 grad_norm=inf
+2026-05-02 17:18:34,959 [INFO]   [LSTM_D] batch 1100/1460 loss=0.375827 grad_norm=nan
+2026-05-02 17:18:37,608 [INFO]   [LSTM_D] batch 1200/1460 loss=0.376961 grad_norm=nan
+2026-05-02 17:18:40,277 [INFO]   [LSTM_D] batch 1300/1460 loss=0.378288 grad_norm=nan
+2026-05-02 17:18:42,930 [INFO]   [LSTM_D] batch 1400/1460 loss=0.377175 grad_norm=nan
+2026-05-02 17:19:03,894 [INFO] [LSTM_D] Epoch   5/20 | train=0.378232 | val=0.064042 | IC=0.0290 | RankIC=0.0286 | DirAcc=0.509 | lr=2.71e-04 | gn=nan | 58.5s
+2026-05-02 17:19:06,990 [INFO]   [LSTM_D] batch 100/1460 loss=0.378041 grad_norm=inf
+2026-05-02 17:19:09,732 [INFO]   [LSTM_D] batch 200/1460 loss=0.373091 grad_norm=inf
+2026-05-02 17:19:12,416 [INFO]   [LSTM_D] batch 300/1460 loss=0.379138 grad_norm=inf
+2026-05-02 17:19:15,066 [INFO]   [LSTM_D] batch 400/1460 loss=0.376483 grad_norm=inf
+2026-05-02 17:19:17,718 [INFO]   [LSTM_D] batch 500/1460 loss=0.380126 grad_norm=inf
+2026-05-02 17:19:20,382 [INFO]   [LSTM_D] batch 600/1460 loss=0.379110 grad_norm=inf
+2026-05-02 17:19:23,069 [INFO]   [LSTM_D] batch 700/1460 loss=0.386212 grad_norm=inf
+2026-05-02 17:19:25,790 [INFO]   [LSTM_D] batch 800/1460 loss=0.373378 grad_norm=inf
+2026-05-02 17:19:28,478 [INFO]   [LSTM_D] batch 900/1460 loss=0.377302 grad_norm=inf
+2026-05-02 17:19:31,124 [INFO]   [LSTM_D] batch 1000/1460 loss=0.382495 grad_norm=inf
+2026-05-02 17:19:33,771 [INFO]   [LSTM_D] batch 1100/1460 loss=0.386302 grad_norm=inf
+2026-05-02 17:19:36,434 [INFO]   [LSTM_D] batch 1200/1460 loss=0.381045 grad_norm=inf
+2026-05-02 17:19:39,130 [INFO]   [LSTM_D] batch 1300/1460 loss=0.380492 grad_norm=inf
+2026-05-02 17:19:41,809 [INFO]   [LSTM_D] batch 1400/1460 loss=0.377569 grad_norm=inf
+2026-05-02 17:20:02,766 [INFO] [LSTM_D] Epoch   6/20 | train=0.378062 | val=0.064353 | IC=0.0291 | RankIC=0.0279 | DirAcc=0.515 | lr=2.56e-04 | gn=inf | 58.9s
+2026-05-02 17:20:05,853 [INFO]   [LSTM_D] batch 100/1460 loss=0.375990 grad_norm=inf
+2026-05-02 17:20:08,542 [INFO]   [LSTM_D] batch 200/1460 loss=0.376851 grad_norm=inf
+2026-05-02 17:20:11,226 [INFO]   [LSTM_D] batch 300/1460 loss=0.377431 grad_norm=inf
+2026-05-02 17:20:13,920 [INFO]   [LSTM_D] batch 400/1460 loss=0.378896 grad_norm=inf
+2026-05-02 17:20:16,618 [INFO]   [LSTM_D] batch 500/1460 loss=0.371504 grad_norm=inf
+2026-05-02 17:20:19,303 [INFO]   [LSTM_D] batch 600/1460 loss=0.372748 grad_norm=inf
+2026-05-02 17:20:22,000 [INFO]   [LSTM_D] batch 700/1460 loss=0.387706 grad_norm=inf
+2026-05-02 17:20:24,719 [INFO]   [LSTM_D] batch 800/1460 loss=0.378578 grad_norm=inf
+2026-05-02 17:20:27,401 [INFO]   [LSTM_D] batch 900/1460 loss=0.372718 grad_norm=inf
+2026-05-02 17:20:30,040 [INFO]   [LSTM_D] batch 1000/1460 loss=0.367813 grad_norm=inf
+2026-05-02 17:20:32,696 [INFO]   [LSTM_D] batch 1100/1460 loss=0.377644 grad_norm=inf
+2026-05-02 17:20:35,363 [INFO]   [LSTM_D] batch 1200/1460 loss=0.380327 grad_norm=inf
+2026-05-02 17:20:38,045 [INFO]   [LSTM_D] batch 1300/1460 loss=0.371499 grad_norm=inf
+2026-05-02 17:20:40,733 [INFO]   [LSTM_D] batch 1400/1460 loss=0.374664 grad_norm=inf
+2026-05-02 17:21:01,716 [INFO] [LSTM_D] Epoch   7/20 | train=0.377865 | val=0.064133 | IC=0.0295 | RankIC=0.0280 | DirAcc=0.504 | lr=2.38e-04 | gn=inf | 59.0s
+2026-05-02 17:21:04,789 [INFO]   [LSTM_D] batch 100/1460 loss=0.383959 grad_norm=inf
+2026-05-02 17:21:07,469 [INFO]   [LSTM_D] batch 200/1460 loss=0.369598 grad_norm=inf
+2026-05-02 17:21:10,151 [INFO]   [LSTM_D] batch 300/1460 loss=0.379612 grad_norm=inf
+2026-05-02 17:21:12,812 [INFO]   [LSTM_D] batch 400/1460 loss=0.378336 grad_norm=inf
+2026-05-02 17:21:15,488 [INFO]   [LSTM_D] batch 500/1460 loss=0.377530 grad_norm=inf
+2026-05-02 17:21:18,151 [INFO]   [LSTM_D] batch 600/1460 loss=0.383440 grad_norm=inf
+2026-05-02 17:21:20,880 [INFO]   [LSTM_D] batch 700/1460 loss=0.380616 grad_norm=inf
+2026-05-02 17:21:23,539 [INFO]   [LSTM_D] batch 800/1460 loss=0.379851 grad_norm=inf
+2026-05-02 17:21:26,220 [INFO]   [LSTM_D] batch 900/1460 loss=0.378338 grad_norm=inf
+2026-05-02 17:21:28,953 [INFO]   [LSTM_D] batch 1000/1460 loss=0.377574 grad_norm=inf
+2026-05-02 17:21:31,647 [INFO]   [LSTM_D] batch 1100/1460 loss=0.381940 grad_norm=inf
+2026-05-02 17:21:34,354 [INFO]   [LSTM_D] batch 1200/1460 loss=0.376563 grad_norm=inf
+2026-05-02 17:21:37,060 [INFO]   [LSTM_D] batch 1300/1460 loss=0.380780 grad_norm=inf
+2026-05-02 17:21:39,726 [INFO]   [LSTM_D] batch 1400/1460 loss=0.375273 grad_norm=inf
+2026-05-02 17:22:00,865 [INFO] [LSTM_D] Epoch   8/20 | train=0.377612 | val=0.064294 | IC=0.0310 | RankIC=0.0293 | DirAcc=0.515 | lr=2.18e-04 | gn=inf | 59.1s
+2026-05-02 17:22:00,867 [INFO]   ★ New best IC=0.0310 | val_loss=0.064294
+2026-05-02 17:22:03,928 [INFO]   [LSTM_D] batch 100/1460 loss=0.378781 grad_norm=inf
+2026-05-02 17:22:06,633 [INFO]   [LSTM_D] batch 200/1460 loss=0.376258 grad_norm=inf
+2026-05-02 17:22:09,322 [INFO]   [LSTM_D] batch 300/1460 loss=0.370275 grad_norm=inf
+2026-05-02 17:22:11,987 [INFO]   [LSTM_D] batch 400/1460 loss=0.377328 grad_norm=inf
+2026-05-02 17:22:14,616 [INFO]   [LSTM_D] batch 500/1460 loss=0.378777 grad_norm=inf
+2026-05-02 17:22:17,265 [INFO]   [LSTM_D] batch 600/1460 loss=0.371907 grad_norm=inf
+2026-05-02 17:22:19,943 [INFO]   [LSTM_D] batch 700/1460 loss=0.379308 grad_norm=inf
+2026-05-02 17:22:22,680 [INFO]   [LSTM_D] batch 800/1460 loss=0.363230 grad_norm=inf
+2026-05-02 17:22:25,366 [INFO]   [LSTM_D] batch 900/1460 loss=0.382880 grad_norm=inf
+2026-05-02 17:22:28,044 [INFO]   [LSTM_D] batch 1000/1460 loss=0.376039 grad_norm=inf
+2026-05-02 17:22:30,740 [INFO]   [LSTM_D] batch 1100/1460 loss=0.383642 grad_norm=inf
+2026-05-02 17:22:33,437 [INFO]   [LSTM_D] batch 1200/1460 loss=0.379511 grad_norm=inf
+2026-05-02 17:22:36,132 [INFO]   [LSTM_D] batch 1300/1460 loss=0.380335 grad_norm=inf
+2026-05-02 17:22:38,788 [INFO]   [LSTM_D] batch 1400/1460 loss=0.372575 grad_norm=inf
+2026-05-02 17:22:59,915 [INFO] [LSTM_D] Epoch   9/20 | train=0.377262 | val=0.064234 | IC=0.0309 | RankIC=0.0255 | DirAcc=0.500 | lr=1.97e-04 | gn=inf | 59.0s
+2026-05-02 17:23:03,040 [INFO]   [LSTM_D] batch 100/1460 loss=0.375865 grad_norm=inf
+2026-05-02 17:23:05,731 [INFO]   [LSTM_D] batch 200/1460 loss=0.381374 grad_norm=inf
+2026-05-02 17:23:08,395 [INFO]   [LSTM_D] batch 300/1460 loss=0.379726 grad_norm=inf
+2026-05-02 17:23:11,049 [INFO]   [LSTM_D] batch 400/1460 loss=0.374881 grad_norm=inf
+2026-05-02 17:23:13,729 [INFO]   [LSTM_D] batch 500/1460 loss=0.375708 grad_norm=inf
+2026-05-02 17:23:16,426 [INFO]   [LSTM_D] batch 600/1460 loss=0.373349 grad_norm=inf
+2026-05-02 17:23:19,140 [INFO]   [LSTM_D] batch 700/1460 loss=0.375588 grad_norm=inf
+2026-05-02 17:23:21,834 [INFO]   [LSTM_D] batch 800/1460 loss=0.379701 grad_norm=inf
+2026-05-02 17:23:24,538 [INFO]   [LSTM_D] batch 900/1460 loss=0.374602 grad_norm=inf
+2026-05-02 17:23:27,225 [INFO]   [LSTM_D] batch 1000/1460 loss=0.375723 grad_norm=inf
+2026-05-02 17:23:29,892 [INFO]   [LSTM_D] batch 1100/1460 loss=0.373983 grad_norm=inf
+2026-05-02 17:23:32,570 [INFO]   [LSTM_D] batch 1200/1460 loss=0.380900 grad_norm=inf
+2026-05-02 17:23:35,282 [INFO]   [LSTM_D] batch 1300/1460 loss=0.379001 grad_norm=inf
+2026-05-02 17:23:38,040 [INFO]   [LSTM_D] batch 1400/1460 loss=0.378221 grad_norm=inf
+2026-05-02 17:23:59,202 [INFO] [LSTM_D] Epoch  10/20 | train=0.376869 | val=0.064387 | IC=0.0315 | RankIC=0.0291 | DirAcc=0.510 | lr=1.74e-04 | gn=inf | 59.3s
+2026-05-02 17:23:59,204 [INFO]   ★ New best IC=0.0315 | val_loss=0.064387
+2026-05-02 17:24:02,279 [INFO]   [LSTM_D] batch 100/1460 loss=0.382288 grad_norm=0.0810
+2026-05-02 17:24:04,968 [INFO]   [LSTM_D] batch 200/1460 loss=0.372351 grad_norm=inf
+2026-05-02 17:24:07,629 [INFO]   [LSTM_D] batch 300/1460 loss=0.378603 grad_norm=inf
+2026-05-02 17:24:10,314 [INFO]   [LSTM_D] batch 400/1460 loss=0.377185 grad_norm=inf
+2026-05-02 17:24:12,993 [INFO]   [LSTM_D] batch 500/1460 loss=0.376294 grad_norm=inf
+2026-05-02 17:24:15,700 [INFO]   [LSTM_D] batch 600/1460 loss=0.380286 grad_norm=inf
+2026-05-02 17:24:18,361 [INFO]   [LSTM_D] batch 700/1460 loss=0.377834 grad_norm=inf
+2026-05-02 17:24:21,057 [INFO]   [LSTM_D] batch 800/1460 loss=0.375159 grad_norm=inf
+2026-05-02 17:24:23,692 [INFO]   [LSTM_D] batch 900/1460 loss=0.377614 grad_norm=inf
+2026-05-02 17:24:26,367 [INFO]   [LSTM_D] batch 1000/1460 loss=0.372687 grad_norm=inf
+2026-05-02 17:24:29,014 [INFO]   [LSTM_D] batch 1100/1460 loss=0.373998 grad_norm=inf
+2026-05-02 17:24:31,682 [INFO]   [LSTM_D] batch 1200/1460 loss=0.367021 grad_norm=inf
+2026-05-02 17:24:34,372 [INFO]   [LSTM_D] batch 1300/1460 loss=0.375294 grad_norm=inf
+2026-05-02 17:24:37,081 [INFO]   [LSTM_D] batch 1400/1460 loss=0.382069 grad_norm=inf
+2026-05-02 17:24:58,041 [INFO] [LSTM_D] Epoch  11/20 | train=0.376331 | val=0.064476 | IC=0.0279 | RankIC=0.0231 | DirAcc=0.504 | lr=1.50e-04 | gn=inf | 58.8s
+2026-05-02 17:25:01,091 [INFO]   [LSTM_D] batch 100/1460 loss=0.378546 grad_norm=inf
+2026-05-02 17:25:03,792 [INFO]   [LSTM_D] batch 200/1460 loss=0.381758 grad_norm=inf
+2026-05-02 17:25:06,443 [INFO]   [LSTM_D] batch 300/1460 loss=0.373871 grad_norm=inf
+2026-05-02 17:25:09,125 [INFO]   [LSTM_D] batch 400/1460 loss=0.371338 grad_norm=inf
+2026-05-02 17:25:11,811 [INFO]   [LSTM_D] batch 500/1460 loss=0.377029 grad_norm=inf
+2026-05-02 17:25:14,498 [INFO]   [LSTM_D] batch 600/1460 loss=0.371707 grad_norm=inf
+2026-05-02 17:25:17,163 [INFO]   [LSTM_D] batch 700/1460 loss=0.383346 grad_norm=inf
+2026-05-02 17:25:19,869 [INFO]   [LSTM_D] batch 800/1460 loss=0.389280 grad_norm=inf
+2026-05-02 17:25:22,552 [INFO]   [LSTM_D] batch 900/1460 loss=0.384144 grad_norm=inf
+2026-05-02 17:25:25,275 [INFO]   [LSTM_D] batch 1000/1460 loss=0.380957 grad_norm=inf
+2026-05-02 17:25:28,047 [INFO]   [LSTM_D] batch 1100/1460 loss=0.377530 grad_norm=inf
+2026-05-02 17:25:30,765 [INFO]   [LSTM_D] batch 1200/1460 loss=0.383465 grad_norm=inf
+2026-05-02 17:25:33,464 [INFO]   [LSTM_D] batch 1300/1460 loss=0.376317 grad_norm=inf
+2026-05-02 17:25:36,130 [INFO]   [LSTM_D] batch 1400/1460 loss=0.374880 grad_norm=inf
+2026-05-02 17:25:56,976 [INFO] [LSTM_D] Epoch  12/20 | train=0.375736 | val=0.064645 | IC=0.0301 | RankIC=0.0260 | DirAcc=0.509 | lr=1.27e-04 | gn=inf | 58.9s
+2026-05-02 17:26:00,040 [INFO]   [LSTM_D] batch 100/1460 loss=0.381601 grad_norm=0.1112
+2026-05-02 17:26:02,781 [INFO]   [LSTM_D] batch 200/1460 loss=0.368312 grad_norm=inf
+2026-05-02 17:26:05,487 [INFO]   [LSTM_D] batch 300/1460 loss=0.373633 grad_norm=inf
+2026-05-02 17:26:08,198 [INFO]   [LSTM_D] batch 400/1460 loss=0.363846 grad_norm=inf
+2026-05-02 17:26:10,898 [INFO]   [LSTM_D] batch 500/1460 loss=0.378953 grad_norm=inf
+2026-05-02 17:26:13,582 [INFO]   [LSTM_D] batch 600/1460 loss=0.376698 grad_norm=inf
+2026-05-02 17:26:16,273 [INFO]   [LSTM_D] batch 700/1460 loss=0.376055 grad_norm=inf
+2026-05-02 17:26:18,942 [INFO]   [LSTM_D] batch 800/1460 loss=0.384930 grad_norm=inf
+2026-05-02 17:26:21,616 [INFO]   [LSTM_D] batch 900/1460 loss=0.377250 grad_norm=inf
+2026-05-02 17:26:24,289 [INFO]   [LSTM_D] batch 1000/1460 loss=0.369249 grad_norm=inf
+2026-05-02 17:26:26,979 [INFO]   [LSTM_D] batch 1100/1460 loss=0.376012 grad_norm=inf
+2026-05-02 17:26:29,677 [INFO]   [LSTM_D] batch 1200/1460 loss=0.378646 grad_norm=inf
+2026-05-02 17:26:32,344 [INFO]   [LSTM_D] batch 1300/1460 loss=0.372035 grad_norm=inf
+2026-05-02 17:26:35,011 [INFO]   [LSTM_D] batch 1400/1460 loss=0.380254 grad_norm=inf
+2026-05-02 17:26:55,919 [INFO] [LSTM_D] Epoch  13/20 | train=0.375156 | val=0.064935 | IC=0.0253 | RankIC=0.0213 | DirAcc=0.507 | lr=1.04e-04 | gn=inf | 58.9s
+2026-05-02 17:26:59,003 [INFO]   [LSTM_D] batch 100/1460 loss=0.372846 grad_norm=inf
+2026-05-02 17:27:01,704 [INFO]   [LSTM_D] batch 200/1460 loss=0.376701 grad_norm=inf
+2026-05-02 17:27:04,400 [INFO]   [LSTM_D] batch 300/1460 loss=0.378684 grad_norm=inf
+2026-05-02 17:27:07,065 [INFO]   [LSTM_D] batch 400/1460 loss=0.365566 grad_norm=inf
+2026-05-02 17:27:09,720 [INFO]   [LSTM_D] batch 500/1460 loss=0.373216 grad_norm=inf
+2026-05-02 17:27:12,389 [INFO]   [LSTM_D] batch 600/1460 loss=0.364858 grad_norm=inf
+2026-05-02 17:27:15,057 [INFO]   [LSTM_D] batch 700/1460 loss=0.393109 grad_norm=inf
+2026-05-02 17:27:17,704 [INFO]   [LSTM_D] batch 800/1460 loss=0.361242 grad_norm=inf
+2026-05-02 17:27:20,375 [INFO]   [LSTM_D] batch 900/1460 loss=0.381339 grad_norm=inf
+2026-05-02 17:27:23,067 [INFO]   [LSTM_D] batch 1000/1460 loss=0.377088 grad_norm=inf
+2026-05-02 17:27:25,730 [INFO]   [LSTM_D] batch 1100/1460 loss=0.363822 grad_norm=inf
+2026-05-02 17:27:28,379 [INFO]   [LSTM_D] batch 1200/1460 loss=0.373653 grad_norm=inf
+2026-05-02 17:27:31,034 [INFO]   [LSTM_D] batch 1300/1460 loss=0.371329 grad_norm=inf
+2026-05-02 17:27:33,687 [INFO]   [LSTM_D] batch 1400/1460 loss=0.367276 grad_norm=inf
+2026-05-02 17:27:54,745 [INFO] [LSTM_D] Epoch  14/20 | train=0.374476 | val=0.065030 | IC=0.0271 | RankIC=0.0235 | DirAcc=0.509 | lr=8.26e-05 | gn=inf | 58.8s
+2026-05-02 17:27:57,860 [INFO]   [LSTM_D] batch 100/1460 loss=0.381621 grad_norm=inf
+2026-05-02 17:28:00,546 [INFO]   [LSTM_D] batch 200/1460 loss=0.379493 grad_norm=inf
+2026-05-02 17:28:03,246 [INFO]   [LSTM_D] batch 300/1460 loss=0.374298 grad_norm=inf
+2026-05-02 17:28:05,933 [INFO]   [LSTM_D] batch 400/1460 loss=0.376490 grad_norm=inf
+2026-05-02 17:28:08,609 [INFO]   [LSTM_D] batch 500/1460 loss=0.380382 grad_norm=inf
+2026-05-02 17:28:11,254 [INFO]   [LSTM_D] batch 600/1460 loss=0.383349 grad_norm=inf
+2026-05-02 17:28:13,934 [INFO]   [LSTM_D] batch 700/1460 loss=0.372343 grad_norm=inf
+2026-05-02 17:28:16,622 [INFO]   [LSTM_D] batch 800/1460 loss=0.365965 grad_norm=inf
+2026-05-02 17:28:19,278 [INFO]   [LSTM_D] batch 900/1460 loss=0.383995 grad_norm=inf
+2026-05-02 17:28:21,923 [INFO]   [LSTM_D] batch 1000/1460 loss=0.371892 grad_norm=inf
+2026-05-02 17:28:24,590 [INFO]   [LSTM_D] batch 1100/1460 loss=0.369008 grad_norm=inf
+2026-05-02 17:28:27,234 [INFO]   [LSTM_D] batch 1200/1460 loss=0.376685 grad_norm=inf
+2026-05-02 17:28:29,900 [INFO]   [LSTM_D] batch 1300/1460 loss=0.366335 grad_norm=inf
+2026-05-02 17:28:32,555 [INFO]   [LSTM_D] batch 1400/1460 loss=0.363131 grad_norm=inf
+2026-05-02 17:28:53,502 [INFO] [LSTM_D] Epoch  15/20 | train=0.373655 | val=0.065304 | IC=0.0274 | RankIC=0.0255 | DirAcc=0.507 | lr=6.26e-05 | gn=inf | 58.8s
+2026-05-02 17:28:53,502 [INFO]   Early stopping at epoch 15 (best IC=0.0315)
+2026-05-02 17:28:53,515 [INFO]   Training curve → results/wf_daily_only/window_2/LSTM_D_history.csv
+2026-05-02 17:28:53,518 [INFO]   [TFT_D] torch.compile() enabled
+2026-05-02 17:28:53,518 [INFO]   [TFT_D] lr=3.00e-04  wd=1.0e-05  grad_clip=1.0  warmup_steps=0  amp=True
+2026-05-02 17:28:53,519 [INFO] 
+============================================================
+2026-05-02 17:28:53,519 [INFO] Training TFT_D for 20 epochs
+2026-05-02 17:28:53,519 [INFO]   Train batches: 1460, Val batches: 892
+2026-05-02 17:28:53,519 [INFO]   Parameters: 774,258
+2026-05-02 17:28:53,519 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 17:28:53,519 [INFO] ============================================================
+2026-05-02 17:28:58,544 [INFO]   [TFT_D] batch 100/1460 loss=0.371044 grad_norm=1.8841
+2026-05-02 17:29:03,103 [INFO]   [TFT_D] batch 200/1460 loss=0.382825 grad_norm=1.1533
+2026-05-02 17:29:07,689 [INFO]   [TFT_D] batch 300/1460 loss=0.381253 grad_norm=0.8632
+2026-05-02 17:29:12,263 [INFO]   [TFT_D] batch 400/1460 loss=0.376377 grad_norm=0.7074
+2026-05-02 17:29:16,796 [INFO]   [TFT_D] batch 500/1460 loss=0.383845 grad_norm=0.6081
+2026-05-02 17:29:21,333 [INFO]   [TFT_D] batch 600/1460 loss=0.374485 grad_norm=0.5402
+2026-05-02 17:29:25,908 [INFO]   [TFT_D] batch 700/1460 loss=0.381099 grad_norm=0.4885
+2026-05-02 17:29:30,481 [INFO]   [TFT_D] batch 800/1460 loss=0.384750 grad_norm=0.4491
+2026-05-02 17:29:35,027 [INFO]   [TFT_D] batch 900/1460 loss=0.381823 grad_norm=0.4157
+2026-05-02 17:29:39,586 [INFO]   [TFT_D] batch 1000/1460 loss=0.382363 grad_norm=0.3887
+2026-05-02 17:29:44,159 [INFO]   [TFT_D] batch 1100/1460 loss=0.382892 grad_norm=0.3653
+2026-05-02 17:29:48,706 [INFO]   [TFT_D] batch 1200/1460 loss=0.381626 grad_norm=0.3471
+2026-05-02 17:29:53,249 [INFO]   [TFT_D] batch 1300/1460 loss=0.381545 grad_norm=0.3295
+2026-05-02 17:29:57,786 [INFO]   [TFT_D] batch 1400/1460 loss=0.378317 grad_norm=0.3147
+2026-05-02 17:30:20,103 [INFO] [TFT_D] Epoch   1/20 | train=0.381324 | val=0.064513 | IC=0.0186 | RankIC=0.0162 | DirAcc=0.515 | lr=3.00e-04 | gn=0.307 | 86.6s
+2026-05-02 17:30:20,115 [INFO]   ★ New best IC=0.0186 | val_loss=0.064513
+2026-05-02 17:30:25,072 [INFO]   [TFT_D] batch 100/1460 loss=0.372282 grad_norm=0.1099
+2026-05-02 17:30:29,636 [INFO]   [TFT_D] batch 200/1460 loss=0.379809 grad_norm=0.1113
+2026-05-02 17:30:34,149 [INFO]   [TFT_D] batch 300/1460 loss=0.380542 grad_norm=0.1121
+2026-05-02 17:30:38,704 [INFO]   [TFT_D] batch 400/1460 loss=0.386715 grad_norm=0.1111
+2026-05-02 17:30:43,287 [INFO]   [TFT_D] batch 500/1460 loss=0.375035 grad_norm=0.1109
+2026-05-02 17:30:47,844 [INFO]   [TFT_D] batch 600/1460 loss=0.375714 grad_norm=0.1104
+2026-05-02 17:30:52,392 [INFO]   [TFT_D] batch 700/1460 loss=0.380207 grad_norm=0.1095
+2026-05-02 17:30:56,962 [INFO]   [TFT_D] batch 800/1460 loss=0.379430 grad_norm=inf
+2026-05-02 17:31:01,498 [INFO]   [TFT_D] batch 900/1460 loss=0.379542 grad_norm=inf
+2026-05-02 17:31:06,020 [INFO]   [TFT_D] batch 1000/1460 loss=0.383419 grad_norm=inf
+2026-05-02 17:31:10,567 [INFO]   [TFT_D] batch 1100/1460 loss=0.381412 grad_norm=inf
+2026-05-02 17:31:15,117 [INFO]   [TFT_D] batch 1200/1460 loss=0.377475 grad_norm=inf
+2026-05-02 17:31:19,670 [INFO]   [TFT_D] batch 1300/1460 loss=0.378861 grad_norm=inf
+2026-05-02 17:31:24,217 [INFO]   [TFT_D] batch 1400/1460 loss=0.380473 grad_norm=inf
+2026-05-02 17:31:46,592 [INFO] [TFT_D] Epoch   2/20 | train=0.378979 | val=0.064719 | IC=0.0250 | RankIC=0.0236 | DirAcc=0.516 | lr=2.98e-04 | gn=inf | 86.5s
+2026-05-02 17:31:46,610 [INFO]   ★ New best IC=0.0250 | val_loss=0.064719
+2026-05-02 17:31:51,506 [INFO]   [TFT_D] batch 100/1460 loss=0.376891 grad_norm=inf
+2026-05-02 17:31:56,040 [INFO]   [TFT_D] batch 200/1460 loss=0.373688 grad_norm=inf
+2026-05-02 17:32:00,542 [INFO]   [TFT_D] batch 300/1460 loss=0.379953 grad_norm=inf
+2026-05-02 17:32:05,115 [INFO]   [TFT_D] batch 400/1460 loss=0.379049 grad_norm=inf
+2026-05-02 17:32:09,658 [INFO]   [TFT_D] batch 500/1460 loss=0.379675 grad_norm=inf
+2026-05-02 17:32:14,197 [INFO]   [TFT_D] batch 600/1460 loss=0.389569 grad_norm=inf
+2026-05-02 17:32:18,744 [INFO]   [TFT_D] batch 700/1460 loss=0.368402 grad_norm=inf
+2026-05-02 17:32:23,290 [INFO]   [TFT_D] batch 800/1460 loss=0.381769 grad_norm=inf
+2026-05-02 17:32:27,812 [INFO]   [TFT_D] batch 900/1460 loss=0.377878 grad_norm=inf
+2026-05-02 17:32:32,367 [INFO]   [TFT_D] batch 1000/1460 loss=0.378209 grad_norm=inf
+2026-05-02 17:32:36,913 [INFO]   [TFT_D] batch 1100/1460 loss=0.375128 grad_norm=inf
+2026-05-02 17:32:41,462 [INFO]   [TFT_D] batch 1200/1460 loss=0.380568 grad_norm=inf
+2026-05-02 17:32:46,036 [INFO]   [TFT_D] batch 1300/1460 loss=0.375840 grad_norm=inf
+2026-05-02 17:32:50,580 [INFO]   [TFT_D] batch 1400/1460 loss=0.381133 grad_norm=inf
+2026-05-02 17:33:12,852 [INFO] [TFT_D] Epoch   3/20 | train=0.378615 | val=0.064031 | IC=0.0313 | RankIC=0.0294 | DirAcc=0.519 | lr=2.93e-04 | gn=inf | 86.2s
+2026-05-02 17:33:12,865 [INFO]   ★ New best IC=0.0313 | val_loss=0.064031
+2026-05-02 17:33:17,813 [INFO]   [TFT_D] batch 100/1460 loss=0.373708 grad_norm=inf
+2026-05-02 17:33:22,319 [INFO]   [TFT_D] batch 200/1460 loss=0.376444 grad_norm=inf
+2026-05-02 17:33:26,858 [INFO]   [TFT_D] batch 300/1460 loss=0.376664 grad_norm=inf
+2026-05-02 17:33:31,415 [INFO]   [TFT_D] batch 400/1460 loss=0.381091 grad_norm=inf
+2026-05-02 17:33:35,983 [INFO]   [TFT_D] batch 500/1460 loss=0.374044 grad_norm=inf
+2026-05-02 17:33:40,507 [INFO]   [TFT_D] batch 600/1460 loss=0.376920 grad_norm=inf
+2026-05-02 17:33:45,062 [INFO]   [TFT_D] batch 700/1460 loss=0.376912 grad_norm=inf
+2026-05-02 17:33:49,625 [INFO]   [TFT_D] batch 800/1460 loss=0.381680 grad_norm=inf
+2026-05-02 17:33:54,162 [INFO]   [TFT_D] batch 900/1460 loss=0.386822 grad_norm=inf
+2026-05-02 17:33:58,691 [INFO]   [TFT_D] batch 1000/1460 loss=0.376498 grad_norm=inf
+2026-05-02 17:34:03,237 [INFO]   [TFT_D] batch 1100/1460 loss=0.375003 grad_norm=inf
+2026-05-02 17:34:07,759 [INFO]   [TFT_D] batch 1200/1460 loss=0.373009 grad_norm=inf
+2026-05-02 17:34:12,294 [INFO]   [TFT_D] batch 1300/1460 loss=0.381656 grad_norm=inf
+2026-05-02 17:34:16,842 [INFO]   [TFT_D] batch 1400/1460 loss=0.373351 grad_norm=inf
+2026-05-02 17:34:39,085 [INFO] [TFT_D] Epoch   4/20 | train=0.378270 | val=0.064094 | IC=0.0330 | RankIC=0.0341 | DirAcc=0.492 | lr=2.84e-04 | gn=inf | 86.2s
+2026-05-02 17:34:39,103 [INFO]   ★ New best IC=0.0330 | val_loss=0.064094
+2026-05-02 17:34:44,061 [INFO]   [TFT_D] batch 100/1460 loss=0.381175 grad_norm=inf
+2026-05-02 17:34:48,619 [INFO]   [TFT_D] batch 200/1460 loss=0.385870 grad_norm=inf
+2026-05-02 17:34:53,153 [INFO]   [TFT_D] batch 300/1460 loss=0.378167 grad_norm=inf
+2026-05-02 17:34:57,727 [INFO]   [TFT_D] batch 400/1460 loss=0.374506 grad_norm=inf
+2026-05-02 17:35:02,280 [INFO]   [TFT_D] batch 500/1460 loss=0.369963 grad_norm=inf
+2026-05-02 17:35:06,849 [INFO]   [TFT_D] batch 600/1460 loss=0.381234 grad_norm=inf
+2026-05-02 17:35:11,394 [INFO]   [TFT_D] batch 700/1460 loss=0.382627 grad_norm=inf
+2026-05-02 17:35:15,931 [INFO]   [TFT_D] batch 800/1460 loss=0.375862 grad_norm=inf
+2026-05-02 17:35:20,499 [INFO]   [TFT_D] batch 900/1460 loss=0.370469 grad_norm=inf
+2026-05-02 17:35:25,061 [INFO]   [TFT_D] batch 1000/1460 loss=0.372494 grad_norm=inf
+2026-05-02 17:35:29,622 [INFO]   [TFT_D] batch 1100/1460 loss=0.374022 grad_norm=inf
+2026-05-02 17:35:34,180 [INFO]   [TFT_D] batch 1200/1460 loss=0.380636 grad_norm=inf
+2026-05-02 17:35:38,699 [INFO]   [TFT_D] batch 1300/1460 loss=0.376117 grad_norm=inf
+2026-05-02 17:35:43,239 [INFO]   [TFT_D] batch 1400/1460 loss=0.372752 grad_norm=inf
+2026-05-02 17:36:05,597 [INFO] [TFT_D] Epoch   5/20 | train=0.377939 | val=0.064216 | IC=0.0277 | RankIC=0.0297 | DirAcc=0.513 | lr=2.71e-04 | gn=inf | 86.5s
+2026-05-02 17:36:10,567 [INFO]   [TFT_D] batch 100/1460 loss=0.384053 grad_norm=inf
+2026-05-02 17:36:15,142 [INFO]   [TFT_D] batch 200/1460 loss=0.377934 grad_norm=inf
+2026-05-02 17:36:19,703 [INFO]   [TFT_D] batch 300/1460 loss=0.377833 grad_norm=inf
+2026-05-02 17:36:24,258 [INFO]   [TFT_D] batch 400/1460 loss=0.369962 grad_norm=inf
+2026-05-02 17:36:28,809 [INFO]   [TFT_D] batch 500/1460 loss=0.378541 grad_norm=inf
+2026-05-02 17:36:33,372 [INFO]   [TFT_D] batch 600/1460 loss=0.373830 grad_norm=inf
+2026-05-02 17:36:37,914 [INFO]   [TFT_D] batch 700/1460 loss=0.380557 grad_norm=inf
+2026-05-02 17:36:42,476 [INFO]   [TFT_D] batch 800/1460 loss=0.377645 grad_norm=inf
+2026-05-02 17:36:46,997 [INFO]   [TFT_D] batch 900/1460 loss=0.381531 grad_norm=inf
+2026-05-02 17:36:51,551 [INFO]   [TFT_D] batch 1000/1460 loss=0.381055 grad_norm=inf
+2026-05-02 17:36:56,101 [INFO]   [TFT_D] batch 1100/1460 loss=0.379120 grad_norm=inf
+2026-05-02 17:37:00,645 [INFO]   [TFT_D] batch 1200/1460 loss=0.384638 grad_norm=inf
+2026-05-02 17:37:05,199 [INFO]   [TFT_D] batch 1300/1460 loss=0.375643 grad_norm=inf
+2026-05-02 17:37:09,734 [INFO]   [TFT_D] batch 1400/1460 loss=0.377682 grad_norm=inf
+2026-05-02 17:37:32,046 [INFO] [TFT_D] Epoch   6/20 | train=0.377455 | val=0.064139 | IC=0.0282 | RankIC=0.0315 | DirAcc=0.513 | lr=2.56e-04 | gn=inf | 86.4s
+2026-05-02 17:37:37,009 [INFO]   [TFT_D] batch 100/1460 loss=0.372006 grad_norm=0.0646
+2026-05-02 17:37:41,562 [INFO]   [TFT_D] batch 200/1460 loss=0.376758 grad_norm=inf
+2026-05-02 17:37:46,121 [INFO]   [TFT_D] batch 300/1460 loss=0.380113 grad_norm=inf
+2026-05-02 17:37:50,640 [INFO]   [TFT_D] batch 400/1460 loss=0.374413 grad_norm=inf
+2026-05-02 17:37:55,177 [INFO]   [TFT_D] batch 500/1460 loss=0.373091 grad_norm=inf
+2026-05-02 17:37:59,697 [INFO]   [TFT_D] batch 600/1460 loss=0.378639 grad_norm=inf
+2026-05-02 17:38:04,232 [INFO]   [TFT_D] batch 700/1460 loss=0.384261 grad_norm=inf
+2026-05-02 17:38:08,781 [INFO]   [TFT_D] batch 800/1460 loss=0.377889 grad_norm=inf
+2026-05-02 17:38:13,324 [INFO]   [TFT_D] batch 900/1460 loss=0.373789 grad_norm=inf
+2026-05-02 17:38:17,875 [INFO]   [TFT_D] batch 1000/1460 loss=0.384919 grad_norm=inf
+2026-05-02 17:38:22,417 [INFO]   [TFT_D] batch 1100/1460 loss=0.374818 grad_norm=inf
+2026-05-02 17:38:26,960 [INFO]   [TFT_D] batch 1200/1460 loss=0.370780 grad_norm=inf
+2026-05-02 17:38:31,506 [INFO]   [TFT_D] batch 1300/1460 loss=0.371097 grad_norm=inf
+2026-05-02 17:38:36,035 [INFO]   [TFT_D] batch 1400/1460 loss=0.372524 grad_norm=inf
+2026-05-02 17:38:58,261 [INFO] [TFT_D] Epoch   7/20 | train=0.376979 | val=0.064121 | IC=0.0254 | RankIC=0.0282 | DirAcc=0.513 | lr=2.38e-04 | gn=inf | 86.2s
+2026-05-02 17:39:03,200 [INFO]   [TFT_D] batch 100/1460 loss=0.375329 grad_norm=0.0706
+2026-05-02 17:39:07,748 [INFO]   [TFT_D] batch 200/1460 loss=0.380677 grad_norm=0.0694
+2026-05-02 17:39:12,283 [INFO]   [TFT_D] batch 300/1460 loss=0.370915 grad_norm=inf
+2026-05-02 17:39:16,816 [INFO]   [TFT_D] batch 400/1460 loss=0.388834 grad_norm=inf
+2026-05-02 17:39:21,360 [INFO]   [TFT_D] batch 500/1460 loss=0.379845 grad_norm=inf
+2026-05-02 17:39:25,904 [INFO]   [TFT_D] batch 600/1460 loss=0.376992 grad_norm=inf
+2026-05-02 17:39:30,453 [INFO]   [TFT_D] batch 700/1460 loss=0.382999 grad_norm=inf
+2026-05-02 17:39:35,016 [INFO]   [TFT_D] batch 800/1460 loss=0.375929 grad_norm=inf
+2026-05-02 17:39:39,579 [INFO]   [TFT_D] batch 900/1460 loss=0.381122 grad_norm=inf
+2026-05-02 17:39:44,119 [INFO]   [TFT_D] batch 1000/1460 loss=0.373577 grad_norm=inf
+2026-05-02 17:39:48,667 [INFO]   [TFT_D] batch 1100/1460 loss=0.383772 grad_norm=inf
+2026-05-02 17:39:53,186 [INFO]   [TFT_D] batch 1200/1460 loss=0.375309 grad_norm=inf
+2026-05-02 17:39:57,725 [INFO]   [TFT_D] batch 1300/1460 loss=0.375796 grad_norm=inf
+2026-05-02 17:40:02,254 [INFO]   [TFT_D] batch 1400/1460 loss=0.368013 grad_norm=inf
+2026-05-02 17:40:24,441 [INFO] [TFT_D] Epoch   8/20 | train=0.376379 | val=0.064305 | IC=0.0226 | RankIC=0.0272 | DirAcc=0.512 | lr=2.18e-04 | gn=inf | 86.2s
+2026-05-02 17:40:29,381 [INFO]   [TFT_D] batch 100/1460 loss=0.384499 grad_norm=0.0638
+2026-05-02 17:40:33,922 [INFO]   [TFT_D] batch 200/1460 loss=0.383782 grad_norm=inf
+2026-05-02 17:40:38,426 [INFO]   [TFT_D] batch 300/1460 loss=0.370750 grad_norm=inf
+2026-05-02 17:40:42,948 [INFO]   [TFT_D] batch 400/1460 loss=0.380908 grad_norm=inf
+2026-05-02 17:40:47,484 [INFO]   [TFT_D] batch 500/1460 loss=0.371384 grad_norm=inf
+2026-05-02 17:40:52,037 [INFO]   [TFT_D] batch 600/1460 loss=0.373637 grad_norm=inf
+2026-05-02 17:40:56,565 [INFO]   [TFT_D] batch 700/1460 loss=0.384069 grad_norm=inf
+2026-05-02 17:41:01,127 [INFO]   [TFT_D] batch 800/1460 loss=0.381716 grad_norm=inf
+2026-05-02 17:41:05,693 [INFO]   [TFT_D] batch 900/1460 loss=0.376925 grad_norm=inf
+2026-05-02 17:41:10,238 [INFO]   [TFT_D] batch 1000/1460 loss=0.373888 grad_norm=inf
+2026-05-02 17:41:14,783 [INFO]   [TFT_D] batch 1100/1460 loss=0.377379 grad_norm=inf
+2026-05-02 17:41:19,317 [INFO]   [TFT_D] batch 1200/1460 loss=0.373827 grad_norm=inf
+2026-05-02 17:41:23,864 [INFO]   [TFT_D] batch 1300/1460 loss=0.377220 grad_norm=inf
+2026-05-02 17:41:28,422 [INFO]   [TFT_D] batch 1400/1460 loss=0.371229 grad_norm=nan
+2026-05-02 17:41:52,460 [INFO] [TFT_D] Epoch   9/20 | train=0.375788 | val=0.064279 | IC=0.0217 | RankIC=0.0262 | DirAcc=0.511 | lr=1.97e-04 | gn=nan | 88.0s
+2026-05-02 17:41:52,460 [INFO]   Early stopping at epoch 9 (best IC=0.0330)
+2026-05-02 17:41:52,486 [INFO]   Training curve → results/wf_daily_only/window_2/TFT_D_history.csv
+2026-05-02 17:41:52,488 [INFO] 
+  Phase 3: Training meta model...
+2026-05-02 17:41:52,490 [WARNING]   No minute weights found — minute sub-models will be random init
+2026-05-02 17:41:52,491 [INFO] Collecting sub-model outputs for meta training...
+2026-05-02 17:41:52,492 [INFO] Sub-models frozen for meta training (2 models)
+2026-05-02 17:43:18,659 [INFO]   Meta align: 186930 union keys | matched: lstm_d=186880, tft_d=186880
+2026-05-02 17:44:08,162 [INFO]   Meta align: 114101 union keys | matched: lstm_d=114101, tft_d=114101
+2026-05-02 17:44:08,699 [INFO]   Meta train: 186,930 | val: 114,101
+2026-05-02 17:44:08,699 [INFO] 
+============================================================
+2026-05-02 17:44:08,699 [INFO] Training MetaMLP for 10 epochs (18,659 params)
+2026-05-02 17:44:08,699 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 17:44:08,699 [INFO] ============================================================
+2026-05-02 17:44:13,047 [INFO] [Meta] Epoch   1/10 | train=0.006849 | val=0.006815 | IC=0.0406 | RankIC=0.0382 | DirAcc=0.517 | 4.3s
+2026-05-02 17:44:13,048 [INFO]   ★ New best meta IC=0.0406 | val=0.006815
+2026-05-02 17:44:17,121 [INFO] [Meta] Epoch   2/10 | train=0.006817 | val=0.006810 | IC=0.0362 | RankIC=0.0367 | DirAcc=0.502 | 4.1s
+2026-05-02 17:44:21,292 [INFO] [Meta] Epoch   3/10 | train=0.006811 | val=0.006817 | IC=0.0362 | RankIC=0.0322 | DirAcc=0.512 | 4.2s
+2026-05-02 17:44:25,405 [INFO] [Meta] Epoch   4/10 | train=0.006809 | val=0.006811 | IC=0.0361 | RankIC=0.0373 | DirAcc=0.513 | 4.1s
+2026-05-02 17:44:29,505 [INFO] [Meta] Epoch   5/10 | train=0.006808 | val=0.006811 | IC=0.0333 | RankIC=0.0273 | DirAcc=0.507 | 4.1s
+2026-05-02 17:44:33,769 [INFO] [Meta] Epoch   6/10 | train=0.006806 | val=0.006810 | IC=0.0366 | RankIC=0.0405 | DirAcc=0.507 | 4.3s
+2026-05-02 17:44:33,769 [INFO]   Early stopping at epoch 6 (best IC=0.0406)
+2026-05-02 17:44:33,771 [INFO]   Training curve → results/wf_daily_only/window_2/Meta_history.csv
+2026-05-02 17:44:33,776 [INFO] 
+  Evaluating on validation set for IC weighting...
+2026-05-02 17:45:11,729 [INFO] 
+  Evaluating on test window...
+2026-05-02 17:46:04,977 [INFO] 
+  Window 2 results:
+2026-05-02 17:46:04,978 [INFO]     Val IC=0.0406 (for ensemble weighting)
+2026-05-02 17:46:04,978 [INFO]     Test IC=0.0032, RankIC=0.0148, DirAcc=0.510
+2026-05-02 17:46:04,978 [INFO]     L/S Sharpe=1.7331, MaxDD=-0.1049
+2026-05-02 17:46:04,978 [INFO]     Time: 2102s
+2026-05-02 17:46:04,990 [INFO] HierarchicalForecaster saved → results/wf_daily_only/window_2/fold_2_forecaster.pt
+2026-05-02 17:46:04,990 [INFO]   Saved fold model: results/wf_daily_only/window_2/fold_2_forecaster.pt
+2026-05-02 17:46:04,990 [INFO]   Computing attention prior from window 2 test set...
+2026-05-02 17:46:50,092 [INFO] Attention bias for window 2: {'lstm_d': 0.4287, 'tft_d': 0.1674, 'lstm_m': -0.1987, 'tft_m': -0.1987, 'news': -0.1987}
+2026-05-02 17:46:50,093 [INFO]   Attention prior updated for next window
+2026-05-02 17:46:50,093 [INFO] 
+######################################################################
+2026-05-02 17:46:50,093 [INFO] # WINDOW 3/5
+2026-05-02 17:46:50,093 [INFO] ######################################################################
+2026-05-02 17:51:03,012 [INFO]   Daily:  train=305313, val=166179, test=227191
+2026-05-02 17:51:03,019 [INFO]   Minute: train=0, val=0, test=0
+2026-05-02 17:51:03,021 [INFO]   Skipping sub-models: ['lstm_m', 'tft_m', 'news'] (use_minute=False, use_news=False)
+2026-05-02 17:51:03,225 [INFO] Hierarchical Forecaster parameter count:
+2026-05-02 17:51:03,225 [INFO]   lstm_d      :    256,529
+2026-05-02 17:51:03,225 [INFO]   tft_d       :    774,258
+2026-05-02 17:51:03,225 [INFO]   meta        :     18,659
+2026-05-02 17:51:03,225 [INFO]   TOTAL       :  1,049,446
+2026-05-02 17:51:03,308 [INFO]   Applying attention bias from window 2
+2026-05-02 17:51:03,309 [WARNING] Bias has 5 elements but forecaster has 2 sub-models. Truncating bias.
+2026-05-02 17:51:03,315 [INFO] MetaMLP attention bias applied: {'sub_0': 0.429, 'sub_1': 0.167}
+2026-05-02 17:51:03,318 [INFO] 
+  Phase 1: Training daily models...
+2026-05-02 17:51:03,362 [INFO]   [LSTM_D] torch.compile() enabled
+2026-05-02 17:51:03,367 [INFO]   [LSTM_D] lr=3.00e-04  wd=1.0e-04  grad_clip=1.0  warmup_steps=0  amp=True
+2026-05-02 17:51:03,480 [INFO] 
+============================================================
+2026-05-02 17:51:03,481 [INFO] Training LSTM_D for 20 epochs
+2026-05-02 17:51:03,482 [INFO]   Train batches: 2385, Val batches: 1299
+2026-05-02 17:51:03,482 [INFO]   Parameters: 256,529
+2026-05-02 17:51:03,482 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 17:51:03,482 [INFO] ============================================================
+2026-05-02 17:51:07,942 [INFO]   [LSTM_D] batch 100/2385 loss=0.384649 grad_norm=0.4987
+2026-05-02 17:51:10,615 [INFO]   [LSTM_D] batch 200/2385 loss=0.385609 grad_norm=0.4173
+2026-05-02 17:51:13,261 [INFO]   [LSTM_D] batch 300/2385 loss=0.383698 grad_norm=0.3493
+2026-05-02 17:51:15,907 [INFO]   [LSTM_D] batch 400/2385 loss=0.381889 grad_norm=0.2971
+2026-05-02 17:51:18,566 [INFO]   [LSTM_D] batch 500/2385 loss=0.376051 grad_norm=0.2598
+2026-05-02 17:51:21,144 [INFO]   [LSTM_D] batch 600/2385 loss=0.372478 grad_norm=0.2311
+2026-05-02 17:51:23,715 [INFO]   [LSTM_D] batch 700/2385 loss=0.381096 grad_norm=0.2092
+2026-05-02 17:51:26,311 [INFO]   [LSTM_D] batch 800/2385 loss=0.382139 grad_norm=0.1910
+2026-05-02 17:51:28,901 [INFO]   [LSTM_D] batch 900/2385 loss=0.376570 grad_norm=0.1767
+2026-05-02 17:51:31,532 [INFO]   [LSTM_D] batch 1000/2385 loss=0.372129 grad_norm=0.1645
+2026-05-02 17:51:34,169 [INFO]   [LSTM_D] batch 1100/2385 loss=0.377947 grad_norm=0.1544
+2026-05-02 17:51:36,799 [INFO]   [LSTM_D] batch 1200/2385 loss=0.380598 grad_norm=0.1458
+2026-05-02 17:51:39,404 [INFO]   [LSTM_D] batch 1300/2385 loss=0.376542 grad_norm=0.1385
+2026-05-02 17:51:42,042 [INFO]   [LSTM_D] batch 1400/2385 loss=0.378252 grad_norm=0.1322
+2026-05-02 17:51:44,674 [INFO]   [LSTM_D] batch 1500/2385 loss=0.378486 grad_norm=0.1265
+2026-05-02 17:51:47,270 [INFO]   [LSTM_D] batch 1600/2385 loss=0.387465 grad_norm=0.1213
+2026-05-02 17:51:49,874 [INFO]   [LSTM_D] batch 1700/2385 loss=0.382101 grad_norm=0.1168
+2026-05-02 17:51:52,488 [INFO]   [LSTM_D] batch 1800/2385 loss=0.379540 grad_norm=0.1127
+2026-05-02 17:51:55,099 [INFO]   [LSTM_D] batch 1900/2385 loss=0.378327 grad_norm=0.1093
+2026-05-02 17:51:57,724 [INFO]   [LSTM_D] batch 2000/2385 loss=0.375658 grad_norm=0.1061
+2026-05-02 17:52:00,299 [INFO]   [LSTM_D] batch 2100/2385 loss=0.381262 grad_norm=0.1030
+2026-05-02 17:52:02,872 [INFO]   [LSTM_D] batch 2200/2385 loss=0.383215 grad_norm=0.1001
+2026-05-02 17:52:05,472 [INFO]   [LSTM_D] batch 2300/2385 loss=0.380030 grad_norm=0.0976
+2026-05-02 17:52:35,569 [INFO] [LSTM_D] Epoch   1/20 | train=0.379865 | val=0.063733 | IC=0.0226 | RankIC=0.0298 | DirAcc=0.504 | lr=3.00e-04 | gn=0.096 | 92.1s
+2026-05-02 17:52:35,580 [INFO]   ★ New best IC=0.0226 | val_loss=0.063733
+2026-05-02 17:52:38,681 [INFO]   [LSTM_D] batch 100/2385 loss=0.378271 grad_norm=0.0359
+2026-05-02 17:52:41,333 [INFO]   [LSTM_D] batch 200/2385 loss=0.389147 grad_norm=inf
+2026-05-02 17:52:43,942 [INFO]   [LSTM_D] batch 300/2385 loss=0.377521 grad_norm=inf
+2026-05-02 17:52:46,563 [INFO]   [LSTM_D] batch 400/2385 loss=0.382804 grad_norm=inf
+2026-05-02 17:52:49,201 [INFO]   [LSTM_D] batch 500/2385 loss=0.382871 grad_norm=inf
+2026-05-02 17:52:51,787 [INFO]   [LSTM_D] batch 600/2385 loss=0.372302 grad_norm=inf
+2026-05-02 17:52:54,359 [INFO]   [LSTM_D] batch 700/2385 loss=0.380271 grad_norm=inf
+2026-05-02 17:52:56,947 [INFO]   [LSTM_D] batch 800/2385 loss=0.385254 grad_norm=inf
+2026-05-02 17:52:59,501 [INFO]   [LSTM_D] batch 900/2385 loss=0.377592 grad_norm=inf
+2026-05-02 17:53:02,076 [INFO]   [LSTM_D] batch 1000/2385 loss=0.381821 grad_norm=inf
+2026-05-02 17:53:04,696 [INFO]   [LSTM_D] batch 1100/2385 loss=0.383242 grad_norm=inf
+2026-05-02 17:53:07,318 [INFO]   [LSTM_D] batch 1200/2385 loss=0.381170 grad_norm=inf
+2026-05-02 17:53:09,927 [INFO]   [LSTM_D] batch 1300/2385 loss=0.380213 grad_norm=inf
+2026-05-02 17:53:12,543 [INFO]   [LSTM_D] batch 1400/2385 loss=0.375896 grad_norm=inf
+2026-05-02 17:53:15,175 [INFO]   [LSTM_D] batch 1500/2385 loss=0.372307 grad_norm=inf
+2026-05-02 17:53:17,793 [INFO]   [LSTM_D] batch 1600/2385 loss=0.374643 grad_norm=inf
+2026-05-02 17:53:20,418 [INFO]   [LSTM_D] batch 1700/2385 loss=0.380609 grad_norm=inf
+2026-05-02 17:53:23,021 [INFO]   [LSTM_D] batch 1800/2385 loss=0.383865 grad_norm=inf
+2026-05-02 17:53:25,672 [INFO]   [LSTM_D] batch 1900/2385 loss=0.384091 grad_norm=inf
+2026-05-02 17:53:28,294 [INFO]   [LSTM_D] batch 2000/2385 loss=0.376186 grad_norm=inf
+2026-05-02 17:53:30,927 [INFO]   [LSTM_D] batch 2100/2385 loss=0.376428 grad_norm=inf
+2026-05-02 17:53:33,561 [INFO]   [LSTM_D] batch 2200/2385 loss=0.388063 grad_norm=inf
+2026-05-02 17:53:36,195 [INFO]   [LSTM_D] batch 2300/2385 loss=0.379146 grad_norm=inf
+2026-05-02 17:54:06,037 [INFO] [LSTM_D] Epoch   2/20 | train=0.379101 | val=0.064296 | IC=0.0204 | RankIC=0.0243 | DirAcc=0.511 | lr=2.98e-04 | gn=inf | 90.5s
+2026-05-02 17:54:09,088 [INFO]   [LSTM_D] batch 100/2385 loss=0.381017 grad_norm=inf
+2026-05-02 17:54:11,742 [INFO]   [LSTM_D] batch 200/2385 loss=0.383246 grad_norm=inf
+2026-05-02 17:54:14,380 [INFO]   [LSTM_D] batch 300/2385 loss=0.381873 grad_norm=inf
+2026-05-02 17:54:17,012 [INFO]   [LSTM_D] batch 400/2385 loss=0.376471 grad_norm=inf
+2026-05-02 17:54:19,637 [INFO]   [LSTM_D] batch 500/2385 loss=0.374791 grad_norm=inf
+2026-05-02 17:54:22,253 [INFO]   [LSTM_D] batch 600/2385 loss=0.377132 grad_norm=inf
+2026-05-02 17:54:24,847 [INFO]   [LSTM_D] batch 700/2385 loss=0.382405 grad_norm=inf
+2026-05-02 17:54:27,425 [INFO]   [LSTM_D] batch 800/2385 loss=0.375944 grad_norm=inf
+2026-05-02 17:54:30,027 [INFO]   [LSTM_D] batch 900/2385 loss=0.377587 grad_norm=inf
+2026-05-02 17:54:32,638 [INFO]   [LSTM_D] batch 1000/2385 loss=0.378723 grad_norm=inf
+2026-05-02 17:54:35,248 [INFO]   [LSTM_D] batch 1100/2385 loss=0.378519 grad_norm=inf
+2026-05-02 17:54:37,871 [INFO]   [LSTM_D] batch 1200/2385 loss=0.376823 grad_norm=inf
+2026-05-02 17:54:40,498 [INFO]   [LSTM_D] batch 1300/2385 loss=0.372944 grad_norm=inf
+2026-05-02 17:54:43,099 [INFO]   [LSTM_D] batch 1400/2385 loss=0.377597 grad_norm=inf
+2026-05-02 17:54:45,714 [INFO]   [LSTM_D] batch 1500/2385 loss=0.383196 grad_norm=inf
+2026-05-02 17:54:48,339 [INFO]   [LSTM_D] batch 1600/2385 loss=0.377611 grad_norm=inf
+2026-05-02 17:54:50,949 [INFO]   [LSTM_D] batch 1700/2385 loss=0.375672 grad_norm=inf
+2026-05-02 17:54:53,568 [INFO]   [LSTM_D] batch 1800/2385 loss=0.378299 grad_norm=inf
+2026-05-02 17:54:56,209 [INFO]   [LSTM_D] batch 1900/2385 loss=0.376754 grad_norm=inf
+2026-05-02 17:54:58,846 [INFO]   [LSTM_D] batch 2000/2385 loss=0.379053 grad_norm=inf
+2026-05-02 17:55:01,461 [INFO]   [LSTM_D] batch 2100/2385 loss=0.381822 grad_norm=inf
+2026-05-02 17:55:04,111 [INFO]   [LSTM_D] batch 2200/2385 loss=0.374971 grad_norm=inf
+2026-05-02 17:55:06,724 [INFO]   [LSTM_D] batch 2300/2385 loss=0.376798 grad_norm=inf
+2026-05-02 17:55:36,374 [INFO] [LSTM_D] Epoch   3/20 | train=0.378905 | val=0.063795 | IC=0.0254 | RankIC=0.0242 | DirAcc=0.509 | lr=2.93e-04 | gn=inf | 90.3s
+2026-05-02 17:55:36,376 [INFO]   ★ New best IC=0.0254 | val_loss=0.063795
+2026-05-02 17:55:39,449 [INFO]   [LSTM_D] batch 100/2385 loss=0.374587 grad_norm=inf
+2026-05-02 17:55:42,061 [INFO]   [LSTM_D] batch 200/2385 loss=0.376653 grad_norm=inf
+2026-05-02 17:55:44,683 [INFO]   [LSTM_D] batch 300/2385 loss=0.380428 grad_norm=inf
+2026-05-02 17:55:47,290 [INFO]   [LSTM_D] batch 400/2385 loss=0.375015 grad_norm=inf
+2026-05-02 17:55:49,889 [INFO]   [LSTM_D] batch 500/2385 loss=0.384573 grad_norm=inf
+2026-05-02 17:55:52,477 [INFO]   [LSTM_D] batch 600/2385 loss=0.376857 grad_norm=inf
+2026-05-02 17:55:55,084 [INFO]   [LSTM_D] batch 700/2385 loss=0.373940 grad_norm=inf
+2026-05-02 17:55:57,647 [INFO]   [LSTM_D] batch 800/2385 loss=0.380921 grad_norm=inf
+2026-05-02 17:56:00,219 [INFO]   [LSTM_D] batch 900/2385 loss=0.376547 grad_norm=inf
+2026-05-02 17:56:02,830 [INFO]   [LSTM_D] batch 1000/2385 loss=0.375376 grad_norm=inf
+2026-05-02 17:56:05,421 [INFO]   [LSTM_D] batch 1100/2385 loss=0.375168 grad_norm=inf
+2026-05-02 17:56:08,012 [INFO]   [LSTM_D] batch 1200/2385 loss=0.374895 grad_norm=inf
+2026-05-02 17:56:10,576 [INFO]   [LSTM_D] batch 1300/2385 loss=0.377550 grad_norm=inf
+2026-05-02 17:56:13,165 [INFO]   [LSTM_D] batch 1400/2385 loss=0.375147 grad_norm=inf
+2026-05-02 17:56:15,771 [INFO]   [LSTM_D] batch 1500/2385 loss=0.374910 grad_norm=inf
+2026-05-02 17:56:18,341 [INFO]   [LSTM_D] batch 1600/2385 loss=0.379128 grad_norm=inf
+2026-05-02 17:56:20,946 [INFO]   [LSTM_D] batch 1700/2385 loss=0.380144 grad_norm=inf
+2026-05-02 17:56:23,506 [INFO]   [LSTM_D] batch 1800/2385 loss=0.379317 grad_norm=inf
+2026-05-02 17:56:26,106 [INFO]   [LSTM_D] batch 1900/2385 loss=0.379418 grad_norm=inf
+2026-05-02 17:56:28,698 [INFO]   [LSTM_D] batch 2000/2385 loss=0.381509 grad_norm=inf
+2026-05-02 17:56:31,287 [INFO]   [LSTM_D] batch 2100/2385 loss=0.380210 grad_norm=inf
+2026-05-02 17:56:33,906 [INFO]   [LSTM_D] batch 2200/2385 loss=0.384773 grad_norm=inf
+2026-05-02 17:56:36,513 [INFO]   [LSTM_D] batch 2300/2385 loss=0.387593 grad_norm=inf
+2026-05-02 17:57:06,289 [INFO] [LSTM_D] Epoch   4/20 | train=0.378653 | val=0.063812 | IC=0.0187 | RankIC=0.0121 | DirAcc=0.500 | lr=2.84e-04 | gn=inf | 89.9s
+2026-05-02 17:57:09,294 [INFO]   [LSTM_D] batch 100/2385 loss=0.377886 grad_norm=inf
+2026-05-02 17:57:11,883 [INFO]   [LSTM_D] batch 200/2385 loss=0.376636 grad_norm=inf
+2026-05-02 17:57:14,523 [INFO]   [LSTM_D] batch 300/2385 loss=0.373608 grad_norm=inf
+2026-05-02 17:57:17,144 [INFO]   [LSTM_D] batch 400/2385 loss=0.374855 grad_norm=inf
+2026-05-02 17:57:19,727 [INFO]   [LSTM_D] batch 500/2385 loss=0.374681 grad_norm=inf
+2026-05-02 17:57:22,320 [INFO]   [LSTM_D] batch 600/2385 loss=0.379729 grad_norm=inf
+2026-05-02 17:57:24,951 [INFO]   [LSTM_D] batch 700/2385 loss=0.370011 grad_norm=inf
+2026-05-02 17:57:27,577 [INFO]   [LSTM_D] batch 800/2385 loss=0.378133 grad_norm=inf
+2026-05-02 17:57:30,200 [INFO]   [LSTM_D] batch 900/2385 loss=0.379093 grad_norm=inf
+2026-05-02 17:57:32,823 [INFO]   [LSTM_D] batch 1000/2385 loss=0.373473 grad_norm=inf
+2026-05-02 17:57:35,439 [INFO]   [LSTM_D] batch 1100/2385 loss=0.374128 grad_norm=inf
+2026-05-02 17:57:38,027 [INFO]   [LSTM_D] batch 1200/2385 loss=0.384998 grad_norm=inf
+2026-05-02 17:57:40,626 [INFO]   [LSTM_D] batch 1300/2385 loss=0.374980 grad_norm=inf
+2026-05-02 17:57:43,238 [INFO]   [LSTM_D] batch 1400/2385 loss=0.381305 grad_norm=inf
+2026-05-02 17:57:45,859 [INFO]   [LSTM_D] batch 1500/2385 loss=0.380397 grad_norm=inf
+2026-05-02 17:57:48,477 [INFO]   [LSTM_D] batch 1600/2385 loss=0.385763 grad_norm=inf
+2026-05-02 17:57:51,117 [INFO]   [LSTM_D] batch 1700/2385 loss=0.376082 grad_norm=inf
+2026-05-02 17:57:53,741 [INFO]   [LSTM_D] batch 1800/2385 loss=0.383525 grad_norm=inf
+2026-05-02 17:57:56,349 [INFO]   [LSTM_D] batch 1900/2385 loss=0.377642 grad_norm=inf
+2026-05-02 17:57:58,961 [INFO]   [LSTM_D] batch 2000/2385 loss=0.378140 grad_norm=inf
+2026-05-02 17:58:01,591 [INFO]   [LSTM_D] batch 2100/2385 loss=0.374112 grad_norm=inf
+2026-05-02 17:58:04,217 [INFO]   [LSTM_D] batch 2200/2385 loss=0.375339 grad_norm=inf
+2026-05-02 17:58:06,833 [INFO]   [LSTM_D] batch 2300/2385 loss=0.379259 grad_norm=inf
+2026-05-02 17:58:36,439 [INFO] [LSTM_D] Epoch   5/20 | train=0.378390 | val=0.064146 | IC=0.0248 | RankIC=0.0197 | DirAcc=0.512 | lr=2.71e-04 | gn=inf | 90.1s
+2026-05-02 17:58:39,505 [INFO]   [LSTM_D] batch 100/2385 loss=0.379253 grad_norm=0.0402
+2026-05-02 17:58:42,156 [INFO]   [LSTM_D] batch 200/2385 loss=0.371458 grad_norm=inf
+2026-05-02 17:58:44,811 [INFO]   [LSTM_D] batch 300/2385 loss=0.384199 grad_norm=inf
+2026-05-02 17:58:47,451 [INFO]   [LSTM_D] batch 400/2385 loss=0.377413 grad_norm=inf
+2026-05-02 17:58:50,124 [INFO]   [LSTM_D] batch 500/2385 loss=0.384854 grad_norm=inf
+2026-05-02 17:58:52,796 [INFO]   [LSTM_D] batch 600/2385 loss=0.375047 grad_norm=inf
+2026-05-02 17:58:55,467 [INFO]   [LSTM_D] batch 700/2385 loss=0.373059 grad_norm=inf
+2026-05-02 17:58:58,068 [INFO]   [LSTM_D] batch 800/2385 loss=0.381752 grad_norm=inf
+2026-05-02 17:59:00,669 [INFO]   [LSTM_D] batch 900/2385 loss=0.379952 grad_norm=inf
+2026-05-02 17:59:03,295 [INFO]   [LSTM_D] batch 1000/2385 loss=0.373508 grad_norm=inf
+2026-05-02 17:59:05,887 [INFO]   [LSTM_D] batch 1100/2385 loss=0.379060 grad_norm=inf
+2026-05-02 17:59:08,527 [INFO]   [LSTM_D] batch 1200/2385 loss=0.379707 grad_norm=inf
+2026-05-02 17:59:11,147 [INFO]   [LSTM_D] batch 1300/2385 loss=0.375764 grad_norm=inf
+2026-05-02 17:59:13,777 [INFO]   [LSTM_D] batch 1400/2385 loss=0.371496 grad_norm=inf
+2026-05-02 17:59:16,360 [INFO]   [LSTM_D] batch 1500/2385 loss=0.379311 grad_norm=inf
+2026-05-02 17:59:18,926 [INFO]   [LSTM_D] batch 1600/2385 loss=0.376227 grad_norm=inf
+2026-05-02 17:59:21,535 [INFO]   [LSTM_D] batch 1700/2385 loss=0.377194 grad_norm=inf
+2026-05-02 17:59:24,134 [INFO]   [LSTM_D] batch 1800/2385 loss=0.378169 grad_norm=inf
+2026-05-02 17:59:26,726 [INFO]   [LSTM_D] batch 1900/2385 loss=0.377219 grad_norm=inf
+2026-05-02 17:59:29,327 [INFO]   [LSTM_D] batch 2000/2385 loss=0.380144 grad_norm=inf
+2026-05-02 17:59:31,967 [INFO]   [LSTM_D] batch 2100/2385 loss=0.374825 grad_norm=inf
+2026-05-02 17:59:34,595 [INFO]   [LSTM_D] batch 2200/2385 loss=0.376539 grad_norm=inf
+2026-05-02 17:59:37,231 [INFO]   [LSTM_D] batch 2300/2385 loss=0.382316 grad_norm=inf
+2026-05-02 18:00:06,941 [INFO] [LSTM_D] Epoch   6/20 | train=0.378005 | val=0.063992 | IC=0.0140 | RankIC=0.0098 | DirAcc=0.504 | lr=2.56e-04 | gn=inf | 90.5s
+2026-05-02 18:00:10,020 [INFO]   [LSTM_D] batch 100/2385 loss=0.373923 grad_norm=inf
+2026-05-02 18:00:12,671 [INFO]   [LSTM_D] batch 200/2385 loss=0.377717 grad_norm=inf
+2026-05-02 18:00:15,313 [INFO]   [LSTM_D] batch 300/2385 loss=0.377647 grad_norm=inf
+2026-05-02 18:00:17,966 [INFO]   [LSTM_D] batch 400/2385 loss=0.379608 grad_norm=inf
+2026-05-02 18:00:20,643 [INFO]   [LSTM_D] batch 500/2385 loss=0.373501 grad_norm=inf
+2026-05-02 18:00:23,281 [INFO]   [LSTM_D] batch 600/2385 loss=0.383547 grad_norm=inf
+2026-05-02 18:00:25,944 [INFO]   [LSTM_D] batch 700/2385 loss=0.377137 grad_norm=inf
+2026-05-02 18:00:28,591 [INFO]   [LSTM_D] batch 800/2385 loss=0.383654 grad_norm=inf
+2026-05-02 18:00:31,192 [INFO]   [LSTM_D] batch 900/2385 loss=0.376169 grad_norm=inf
+2026-05-02 18:00:33,809 [INFO]   [LSTM_D] batch 1000/2385 loss=0.382637 grad_norm=inf
+2026-05-02 18:00:36,423 [INFO]   [LSTM_D] batch 1100/2385 loss=0.382518 grad_norm=inf
+2026-05-02 18:00:39,106 [INFO]   [LSTM_D] batch 1200/2385 loss=0.369912 grad_norm=inf
+2026-05-02 18:00:41,710 [INFO]   [LSTM_D] batch 1300/2385 loss=0.374486 grad_norm=inf
+2026-05-02 18:00:44,303 [INFO]   [LSTM_D] batch 1400/2385 loss=0.370201 grad_norm=inf
+2026-05-02 18:00:46,922 [INFO]   [LSTM_D] batch 1500/2385 loss=0.377479 grad_norm=inf
+2026-05-02 18:00:49,595 [INFO]   [LSTM_D] batch 1600/2385 loss=0.377750 grad_norm=inf
+2026-05-02 18:00:52,232 [INFO]   [LSTM_D] batch 1700/2385 loss=0.379628 grad_norm=inf
+2026-05-02 18:00:54,864 [INFO]   [LSTM_D] batch 1800/2385 loss=0.373369 grad_norm=inf
+2026-05-02 18:00:57,452 [INFO]   [LSTM_D] batch 1900/2385 loss=0.380009 grad_norm=inf
+2026-05-02 18:01:00,084 [INFO]   [LSTM_D] batch 2000/2385 loss=0.380615 grad_norm=inf
+2026-05-02 18:01:02,699 [INFO]   [LSTM_D] batch 2100/2385 loss=0.382530 grad_norm=inf
+2026-05-02 18:01:05,272 [INFO]   [LSTM_D] batch 2200/2385 loss=0.376058 grad_norm=inf
+2026-05-02 18:01:07,881 [INFO]   [LSTM_D] batch 2300/2385 loss=0.382760 grad_norm=inf
+2026-05-02 18:01:37,551 [INFO] [LSTM_D] Epoch   7/20 | train=0.377538 | val=0.064109 | IC=0.0173 | RankIC=0.0117 | DirAcc=0.507 | lr=2.38e-04 | gn=inf | 90.6s
+2026-05-02 18:01:40,568 [INFO]   [LSTM_D] batch 100/2385 loss=0.381652 grad_norm=0.0609
+2026-05-02 18:01:43,207 [INFO]   [LSTM_D] batch 200/2385 loss=0.380148 grad_norm=0.0626
+2026-05-02 18:01:45,812 [INFO]   [LSTM_D] batch 300/2385 loss=0.376772 grad_norm=inf
+2026-05-02 18:01:48,402 [INFO]   [LSTM_D] batch 400/2385 loss=0.377093 grad_norm=inf
+2026-05-02 18:01:50,985 [INFO]   [LSTM_D] batch 500/2385 loss=0.377962 grad_norm=inf
+2026-05-02 18:01:53,599 [INFO]   [LSTM_D] batch 600/2385 loss=0.384824 grad_norm=inf
+2026-05-02 18:01:56,176 [INFO]   [LSTM_D] batch 700/2385 loss=0.378106 grad_norm=inf
+2026-05-02 18:01:58,783 [INFO]   [LSTM_D] batch 800/2385 loss=0.383839 grad_norm=inf
+2026-05-02 18:02:01,402 [INFO]   [LSTM_D] batch 900/2385 loss=0.369544 grad_norm=inf
+2026-05-02 18:02:03,991 [INFO]   [LSTM_D] batch 1000/2385 loss=0.380361 grad_norm=inf
+2026-05-02 18:02:06,603 [INFO]   [LSTM_D] batch 1100/2385 loss=0.366966 grad_norm=inf
+2026-05-02 18:02:09,225 [INFO]   [LSTM_D] batch 1200/2385 loss=0.374048 grad_norm=inf
+2026-05-02 18:02:11,855 [INFO]   [LSTM_D] batch 1300/2385 loss=0.377719 grad_norm=inf
+2026-05-02 18:02:14,470 [INFO]   [LSTM_D] batch 1400/2385 loss=0.372045 grad_norm=inf
+2026-05-02 18:02:17,105 [INFO]   [LSTM_D] batch 1500/2385 loss=0.370257 grad_norm=inf
+2026-05-02 18:02:19,712 [INFO]   [LSTM_D] batch 1600/2385 loss=0.371911 grad_norm=inf
+2026-05-02 18:02:22,315 [INFO]   [LSTM_D] batch 1700/2385 loss=0.371412 grad_norm=inf
+2026-05-02 18:02:24,915 [INFO]   [LSTM_D] batch 1800/2385 loss=0.377189 grad_norm=inf
+2026-05-02 18:02:27,508 [INFO]   [LSTM_D] batch 1900/2385 loss=0.378762 grad_norm=inf
+2026-05-02 18:02:30,081 [INFO]   [LSTM_D] batch 2000/2385 loss=0.376805 grad_norm=inf
+2026-05-02 18:02:32,688 [INFO]   [LSTM_D] batch 2100/2385 loss=0.382005 grad_norm=inf
+2026-05-02 18:02:35,309 [INFO]   [LSTM_D] batch 2200/2385 loss=0.381841 grad_norm=inf
+2026-05-02 18:02:37,931 [INFO]   [LSTM_D] batch 2300/2385 loss=0.378488 grad_norm=inf
+2026-05-02 18:03:07,652 [INFO] [LSTM_D] Epoch   8/20 | train=0.376907 | val=0.064276 | IC=0.0053 | RankIC=-0.0004 | DirAcc=0.500 | lr=2.18e-04 | gn=inf | 90.1s
+2026-05-02 18:03:07,653 [INFO]   Early stopping at epoch 8 (best IC=0.0254)
+2026-05-02 18:03:07,661 [INFO]   Training curve → results/wf_daily_only/window_3/LSTM_D_history.csv
+2026-05-02 18:03:07,664 [INFO]   [TFT_D] torch.compile() enabled
+2026-05-02 18:03:07,664 [INFO]   [TFT_D] lr=3.00e-04  wd=1.0e-05  grad_clip=1.0  warmup_steps=0  amp=True
+2026-05-02 18:03:07,664 [INFO] 
+============================================================
+2026-05-02 18:03:07,665 [INFO] Training TFT_D for 20 epochs
+2026-05-02 18:03:07,665 [INFO]   Train batches: 2385, Val batches: 1299
+2026-05-02 18:03:07,665 [INFO]   Parameters: 774,258
+2026-05-02 18:03:07,665 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 18:03:07,665 [INFO] ============================================================
+2026-05-02 18:03:12,729 [INFO]   [TFT_D] batch 100/2385 loss=0.382600 grad_norm=1.7215
+2026-05-02 18:03:17,261 [INFO]   [TFT_D] batch 200/2385 loss=0.383814 grad_norm=1.0658
+2026-05-02 18:03:21,793 [INFO]   [TFT_D] batch 300/2385 loss=0.375852 grad_norm=0.8157
+2026-05-02 18:03:26,320 [INFO]   [TFT_D] batch 400/2385 loss=0.375934 grad_norm=0.6803
+2026-05-02 18:03:30,835 [INFO]   [TFT_D] batch 500/2385 loss=0.378365 grad_norm=0.5835
+2026-05-02 18:03:35,369 [INFO]   [TFT_D] batch 600/2385 loss=0.380972 grad_norm=0.5179
+2026-05-02 18:03:39,908 [INFO]   [TFT_D] batch 700/2385 loss=0.379193 grad_norm=0.4686
+2026-05-02 18:03:44,452 [INFO]   [TFT_D] batch 800/2385 loss=0.381152 grad_norm=0.4298
+2026-05-02 18:03:48,984 [INFO]   [TFT_D] batch 900/2385 loss=0.377938 grad_norm=0.3984
+2026-05-02 18:03:53,497 [INFO]   [TFT_D] batch 1000/2385 loss=0.382027 grad_norm=0.3720
+2026-05-02 18:03:58,019 [INFO]   [TFT_D] batch 1100/2385 loss=0.376170 grad_norm=0.3497
+2026-05-02 18:04:02,520 [INFO]   [TFT_D] batch 1200/2385 loss=0.375743 grad_norm=0.3312
+2026-05-02 18:04:07,035 [INFO]   [TFT_D] batch 1300/2385 loss=0.378575 grad_norm=0.3148
+2026-05-02 18:04:11,551 [INFO]   [TFT_D] batch 1400/2385 loss=0.376537 grad_norm=0.3014
+2026-05-02 18:04:16,079 [INFO]   [TFT_D] batch 1500/2385 loss=0.379551 grad_norm=0.2883
+2026-05-02 18:04:20,598 [INFO]   [TFT_D] batch 1600/2385 loss=0.380260 grad_norm=0.2767
+2026-05-02 18:04:25,113 [INFO]   [TFT_D] batch 1700/2385 loss=0.373942 grad_norm=0.2666
+2026-05-02 18:04:29,625 [INFO]   [TFT_D] batch 1800/2385 loss=0.379988 grad_norm=0.2575
+2026-05-02 18:04:34,149 [INFO]   [TFT_D] batch 1900/2385 loss=0.379911 grad_norm=0.2490
+2026-05-02 18:04:38,649 [INFO]   [TFT_D] batch 2000/2385 loss=0.384351 grad_norm=0.2414
+2026-05-02 18:04:43,175 [INFO]   [TFT_D] batch 2100/2385 loss=0.384499 grad_norm=0.2343
+2026-05-02 18:04:47,689 [INFO]   [TFT_D] batch 2200/2385 loss=0.383362 grad_norm=0.2279
+2026-05-02 18:04:52,225 [INFO]   [TFT_D] batch 2300/2385 loss=0.371184 grad_norm=0.2219
+2026-05-02 18:05:23,770 [INFO] [TFT_D] Epoch   1/20 | train=0.380900 | val=0.064173 | IC=-0.0176 | RankIC=0.0043 | DirAcc=0.509 | lr=3.00e-04 | gn=inf | 136.1s
+2026-05-02 18:05:23,783 [INFO]   ★ New best IC=-0.0176 | val_loss=0.064173
+2026-05-02 18:05:28,723 [INFO]   [TFT_D] batch 100/2385 loss=0.384103 grad_norm=0.0883
+2026-05-02 18:05:33,249 [INFO]   [TFT_D] batch 200/2385 loss=0.373044 grad_norm=inf
+2026-05-02 18:05:37,752 [INFO]   [TFT_D] batch 300/2385 loss=0.375588 grad_norm=inf
+2026-05-02 18:05:42,270 [INFO]   [TFT_D] batch 400/2385 loss=0.378846 grad_norm=inf
+2026-05-02 18:05:46,792 [INFO]   [TFT_D] batch 500/2385 loss=0.380320 grad_norm=inf
+2026-05-02 18:05:51,288 [INFO]   [TFT_D] batch 600/2385 loss=0.379699 grad_norm=inf
+2026-05-02 18:05:55,793 [INFO]   [TFT_D] batch 700/2385 loss=0.380838 grad_norm=inf
+2026-05-02 18:06:00,290 [INFO]   [TFT_D] batch 800/2385 loss=0.377386 grad_norm=inf
+2026-05-02 18:06:04,782 [INFO]   [TFT_D] batch 900/2385 loss=0.376657 grad_norm=inf
+2026-05-02 18:06:09,290 [INFO]   [TFT_D] batch 1000/2385 loss=0.374251 grad_norm=inf
+2026-05-02 18:06:13,786 [INFO]   [TFT_D] batch 1100/2385 loss=0.373045 grad_norm=inf
+2026-05-02 18:06:18,285 [INFO]   [TFT_D] batch 1200/2385 loss=0.383120 grad_norm=inf
+2026-05-02 18:06:22,795 [INFO]   [TFT_D] batch 1300/2385 loss=0.386787 grad_norm=inf
+2026-05-02 18:06:27,314 [INFO]   [TFT_D] batch 1400/2385 loss=0.374051 grad_norm=inf
+2026-05-02 18:06:31,814 [INFO]   [TFT_D] batch 1500/2385 loss=0.376021 grad_norm=inf
+2026-05-02 18:06:36,335 [INFO]   [TFT_D] batch 1600/2385 loss=0.379654 grad_norm=inf
+2026-05-02 18:06:40,850 [INFO]   [TFT_D] batch 1700/2385 loss=0.380780 grad_norm=inf
+2026-05-02 18:06:45,365 [INFO]   [TFT_D] batch 1800/2385 loss=0.382337 grad_norm=inf
+2026-05-02 18:06:49,879 [INFO]   [TFT_D] batch 1900/2385 loss=0.377680 grad_norm=inf
+2026-05-02 18:06:54,379 [INFO]   [TFT_D] batch 2000/2385 loss=0.381063 grad_norm=inf
+2026-05-02 18:06:58,885 [INFO]   [TFT_D] batch 2100/2385 loss=0.385485 grad_norm=inf
+2026-05-02 18:07:03,382 [INFO]   [TFT_D] batch 2200/2385 loss=0.374039 grad_norm=inf
+2026-05-02 18:07:07,871 [INFO]   [TFT_D] batch 2300/2385 loss=0.378375 grad_norm=inf
+2026-05-02 18:07:39,732 [INFO] [TFT_D] Epoch   2/20 | train=0.379031 | val=0.064069 | IC=-0.0021 | RankIC=0.0070 | DirAcc=0.510 | lr=2.98e-04 | gn=inf | 135.9s
+2026-05-02 18:07:39,747 [INFO]   ★ New best IC=-0.0021 | val_loss=0.064069
+2026-05-02 18:07:44,700 [INFO]   [TFT_D] batch 100/2385 loss=0.375960 grad_norm=inf
+2026-05-02 18:07:49,190 [INFO]   [TFT_D] batch 200/2385 loss=0.383106 grad_norm=inf
+2026-05-02 18:07:53,705 [INFO]   [TFT_D] batch 300/2385 loss=0.375649 grad_norm=inf
+2026-05-02 18:07:58,196 [INFO]   [TFT_D] batch 400/2385 loss=0.373648 grad_norm=inf
+2026-05-02 18:08:02,688 [INFO]   [TFT_D] batch 500/2385 loss=0.374387 grad_norm=inf
+2026-05-02 18:08:07,173 [INFO]   [TFT_D] batch 600/2385 loss=0.382454 grad_norm=inf
+2026-05-02 18:08:11,673 [INFO]   [TFT_D] batch 700/2385 loss=0.377844 grad_norm=inf
+2026-05-02 18:08:16,157 [INFO]   [TFT_D] batch 800/2385 loss=0.381086 grad_norm=inf
+2026-05-02 18:08:20,651 [INFO]   [TFT_D] batch 900/2385 loss=0.374582 grad_norm=inf
+2026-05-02 18:08:25,141 [INFO]   [TFT_D] batch 1000/2385 loss=0.372911 grad_norm=inf
+2026-05-02 18:08:29,637 [INFO]   [TFT_D] batch 1100/2385 loss=0.377202 grad_norm=inf
+2026-05-02 18:08:34,130 [INFO]   [TFT_D] batch 1200/2385 loss=0.375354 grad_norm=inf
+2026-05-02 18:08:38,625 [INFO]   [TFT_D] batch 1300/2385 loss=0.376815 grad_norm=inf
+2026-05-02 18:08:43,111 [INFO]   [TFT_D] batch 1400/2385 loss=0.375590 grad_norm=inf
+2026-05-02 18:08:47,608 [INFO]   [TFT_D] batch 1500/2385 loss=0.377536 grad_norm=inf
+2026-05-02 18:08:52,116 [INFO]   [TFT_D] batch 1600/2385 loss=0.378371 grad_norm=inf
+2026-05-02 18:08:56,613 [INFO]   [TFT_D] batch 1700/2385 loss=0.370567 grad_norm=inf
+2026-05-02 18:09:01,126 [INFO]   [TFT_D] batch 1800/2385 loss=0.371909 grad_norm=inf
+2026-05-02 18:09:05,628 [INFO]   [TFT_D] batch 1900/2385 loss=0.375779 grad_norm=inf
+2026-05-02 18:09:10,116 [INFO]   [TFT_D] batch 2000/2385 loss=0.378701 grad_norm=inf
+2026-05-02 18:09:14,631 [INFO]   [TFT_D] batch 2100/2385 loss=0.378636 grad_norm=inf
+2026-05-02 18:09:19,109 [INFO]   [TFT_D] batch 2200/2385 loss=0.370095 grad_norm=inf
+2026-05-02 18:09:23,605 [INFO]   [TFT_D] batch 2300/2385 loss=0.381123 grad_norm=inf
+2026-05-02 18:09:55,399 [INFO] [TFT_D] Epoch   3/20 | train=0.378659 | val=0.064221 | IC=0.0102 | RankIC=0.0145 | DirAcc=0.511 | lr=2.93e-04 | gn=inf | 135.7s
+2026-05-02 18:09:55,417 [INFO]   ★ New best IC=0.0102 | val_loss=0.064221
+2026-05-02 18:10:00,358 [INFO]   [TFT_D] batch 100/2385 loss=0.379137 grad_norm=0.0618
+2026-05-02 18:10:04,837 [INFO]   [TFT_D] batch 200/2385 loss=0.380956 grad_norm=inf
+2026-05-02 18:10:09,302 [INFO]   [TFT_D] batch 300/2385 loss=0.379184 grad_norm=inf
+2026-05-02 18:10:13,794 [INFO]   [TFT_D] batch 400/2385 loss=0.376778 grad_norm=inf
+2026-05-02 18:10:18,270 [INFO]   [TFT_D] batch 500/2385 loss=0.378239 grad_norm=inf
+2026-05-02 18:10:22,771 [INFO]   [TFT_D] batch 600/2385 loss=0.377959 grad_norm=inf
+2026-05-02 18:10:27,264 [INFO]   [TFT_D] batch 700/2385 loss=0.370643 grad_norm=inf
+2026-05-02 18:10:31,751 [INFO]   [TFT_D] batch 800/2385 loss=0.382944 grad_norm=inf
+2026-05-02 18:10:36,248 [INFO]   [TFT_D] batch 900/2385 loss=0.375512 grad_norm=inf
+2026-05-02 18:10:40,754 [INFO]   [TFT_D] batch 1000/2385 loss=0.379482 grad_norm=inf
+2026-05-02 18:10:45,255 [INFO]   [TFT_D] batch 1100/2385 loss=0.376715 grad_norm=inf
+2026-05-02 18:10:49,740 [INFO]   [TFT_D] batch 1200/2385 loss=0.374448 grad_norm=inf
+2026-05-02 18:10:54,255 [INFO]   [TFT_D] batch 1300/2385 loss=0.379125 grad_norm=inf
+2026-05-02 18:10:58,767 [INFO]   [TFT_D] batch 1400/2385 loss=0.386054 grad_norm=inf
+2026-05-02 18:11:03,263 [INFO]   [TFT_D] batch 1500/2385 loss=0.376960 grad_norm=inf
+2026-05-02 18:11:07,752 [INFO]   [TFT_D] batch 1600/2385 loss=0.369130 grad_norm=inf
+2026-05-02 18:11:12,246 [INFO]   [TFT_D] batch 1700/2385 loss=0.381653 grad_norm=inf
+2026-05-02 18:11:16,746 [INFO]   [TFT_D] batch 1800/2385 loss=0.379755 grad_norm=inf
+2026-05-02 18:11:21,267 [INFO]   [TFT_D] batch 1900/2385 loss=0.377693 grad_norm=inf
+2026-05-02 18:11:25,752 [INFO]   [TFT_D] batch 2000/2385 loss=0.375929 grad_norm=inf
+2026-05-02 18:11:30,241 [INFO]   [TFT_D] batch 2100/2385 loss=0.373175 grad_norm=inf
+2026-05-02 18:11:34,735 [INFO]   [TFT_D] batch 2200/2385 loss=0.374695 grad_norm=inf
+2026-05-02 18:11:39,222 [INFO]   [TFT_D] batch 2300/2385 loss=0.382701 grad_norm=inf
+2026-05-02 18:12:11,118 [INFO] [TFT_D] Epoch   4/20 | train=0.378089 | val=0.064906 | IC=0.0117 | RankIC=0.0064 | DirAcc=0.507 | lr=2.84e-04 | gn=inf | 135.7s
+2026-05-02 18:12:11,132 [INFO]   ★ New best IC=0.0117 | val_loss=0.064906
+2026-05-02 18:12:16,058 [INFO]   [TFT_D] batch 100/2385 loss=0.374027 grad_norm=0.0599
+2026-05-02 18:12:20,535 [INFO]   [TFT_D] batch 200/2385 loss=0.380138 grad_norm=inf
+2026-05-02 18:12:25,004 [INFO]   [TFT_D] batch 300/2385 loss=0.383492 grad_norm=inf
+2026-05-02 18:12:29,479 [INFO]   [TFT_D] batch 400/2385 loss=0.376361 grad_norm=inf
+2026-05-02 18:12:33,990 [INFO]   [TFT_D] batch 500/2385 loss=0.370183 grad_norm=inf
+2026-05-02 18:12:38,497 [INFO]   [TFT_D] batch 600/2385 loss=0.375915 grad_norm=inf
+2026-05-02 18:12:42,987 [INFO]   [TFT_D] batch 700/2385 loss=0.377788 grad_norm=inf
+2026-05-02 18:12:47,471 [INFO]   [TFT_D] batch 800/2385 loss=0.370812 grad_norm=inf
+2026-05-02 18:12:51,963 [INFO]   [TFT_D] batch 900/2385 loss=0.367539 grad_norm=inf
+2026-05-02 18:12:56,477 [INFO]   [TFT_D] batch 1000/2385 loss=0.373552 grad_norm=inf
+2026-05-02 18:13:00,996 [INFO]   [TFT_D] batch 1100/2385 loss=0.372071 grad_norm=inf
+2026-05-02 18:13:05,477 [INFO]   [TFT_D] batch 1200/2385 loss=0.375901 grad_norm=inf
+2026-05-02 18:13:09,958 [INFO]   [TFT_D] batch 1300/2385 loss=0.376823 grad_norm=inf
+2026-05-02 18:13:14,451 [INFO]   [TFT_D] batch 1400/2385 loss=0.384711 grad_norm=inf
+2026-05-02 18:13:18,941 [INFO]   [TFT_D] batch 1500/2385 loss=0.379907 grad_norm=inf
+2026-05-02 18:13:23,428 [INFO]   [TFT_D] batch 1600/2385 loss=0.370474 grad_norm=inf
+2026-05-02 18:13:27,921 [INFO]   [TFT_D] batch 1700/2385 loss=0.379503 grad_norm=inf
+2026-05-02 18:13:32,425 [INFO]   [TFT_D] batch 1800/2385 loss=0.379018 grad_norm=inf
+2026-05-02 18:13:36,903 [INFO]   [TFT_D] batch 1900/2385 loss=0.376764 grad_norm=inf
+2026-05-02 18:13:41,413 [INFO]   [TFT_D] batch 2000/2385 loss=0.376776 grad_norm=inf
+2026-05-02 18:13:45,918 [INFO]   [TFT_D] batch 2100/2385 loss=0.377628 grad_norm=inf
+2026-05-02 18:13:50,398 [INFO]   [TFT_D] batch 2200/2385 loss=0.375758 grad_norm=inf
+2026-05-02 18:13:54,893 [INFO]   [TFT_D] batch 2300/2385 loss=0.376956 grad_norm=inf
+2026-05-02 18:14:26,585 [INFO] [TFT_D] Epoch   5/20 | train=0.377461 | val=0.064935 | IC=0.0012 | RankIC=0.0010 | DirAcc=0.498 | lr=2.71e-04 | gn=inf | 135.5s
+2026-05-02 18:14:31,525 [INFO]   [TFT_D] batch 100/2385 loss=0.392800 grad_norm=0.0655
+2026-05-02 18:14:36,033 [INFO]   [TFT_D] batch 200/2385 loss=0.381040 grad_norm=nan
+2026-05-02 18:14:40,545 [INFO]   [TFT_D] batch 300/2385 loss=0.376517 grad_norm=nan
+2026-05-02 18:14:45,048 [INFO]   [TFT_D] batch 400/2385 loss=0.378294 grad_norm=nan
+2026-05-02 18:14:49,557 [INFO]   [TFT_D] batch 500/2385 loss=0.376928 grad_norm=nan
+2026-05-02 18:14:54,091 [INFO]   [TFT_D] batch 600/2385 loss=0.388153 grad_norm=nan
+2026-05-02 18:14:58,599 [INFO]   [TFT_D] batch 700/2385 loss=0.376537 grad_norm=nan
+2026-05-02 18:15:03,097 [INFO]   [TFT_D] batch 800/2385 loss=0.376170 grad_norm=nan
+2026-05-02 18:15:07,593 [INFO]   [TFT_D] batch 900/2385 loss=0.376846 grad_norm=nan
+2026-05-02 18:15:12,113 [INFO]   [TFT_D] batch 1000/2385 loss=0.374424 grad_norm=nan
+2026-05-02 18:15:16,613 [INFO]   [TFT_D] batch 1100/2385 loss=0.377932 grad_norm=nan
+2026-05-02 18:15:21,087 [INFO]   [TFT_D] batch 1200/2385 loss=0.381471 grad_norm=nan
+2026-05-02 18:15:25,582 [INFO]   [TFT_D] batch 1300/2385 loss=0.376294 grad_norm=nan
+2026-05-02 18:15:30,062 [INFO]   [TFT_D] batch 1400/2385 loss=0.381160 grad_norm=nan
+2026-05-02 18:15:34,558 [INFO]   [TFT_D] batch 1500/2385 loss=0.369401 grad_norm=nan
+2026-05-02 18:15:39,041 [INFO]   [TFT_D] batch 1600/2385 loss=0.381070 grad_norm=nan
+2026-05-02 18:15:43,541 [INFO]   [TFT_D] batch 1700/2385 loss=0.373564 grad_norm=nan
+2026-05-02 18:15:48,034 [INFO]   [TFT_D] batch 1800/2385 loss=0.368570 grad_norm=nan
+2026-05-02 18:15:52,523 [INFO]   [TFT_D] batch 1900/2385 loss=0.383569 grad_norm=nan
+2026-05-02 18:15:56,979 [INFO]   [TFT_D] batch 2000/2385 loss=0.378726 grad_norm=nan
+2026-05-02 18:16:01,434 [INFO]   [TFT_D] batch 2100/2385 loss=0.381039 grad_norm=nan
+2026-05-02 18:16:05,912 [INFO]   [TFT_D] batch 2200/2385 loss=0.370013 grad_norm=nan
+2026-05-02 18:16:10,383 [INFO]   [TFT_D] batch 2300/2385 loss=0.381926 grad_norm=nan
+2026-05-02 18:16:41,947 [INFO] [TFT_D] Epoch   6/20 | train=0.376724 | val=0.064293 | IC=0.0043 | RankIC=0.0044 | DirAcc=0.501 | lr=2.56e-04 | gn=nan | 135.4s
+2026-05-02 18:16:46,903 [INFO]   [TFT_D] batch 100/2385 loss=0.376215 grad_norm=0.0660
+2026-05-02 18:16:51,420 [INFO]   [TFT_D] batch 200/2385 loss=0.388162 grad_norm=0.0658
+2026-05-02 18:16:55,956 [INFO]   [TFT_D] batch 300/2385 loss=0.374341 grad_norm=inf
+2026-05-02 18:17:00,464 [INFO]   [TFT_D] batch 400/2385 loss=0.379314 grad_norm=inf
+2026-05-02 18:17:04,969 [INFO]   [TFT_D] batch 500/2385 loss=0.378703 grad_norm=nan
+2026-05-02 18:17:09,467 [INFO]   [TFT_D] batch 600/2385 loss=0.379676 grad_norm=nan
+2026-05-02 18:17:13,969 [INFO]   [TFT_D] batch 700/2385 loss=0.381777 grad_norm=nan
+2026-05-02 18:17:18,469 [INFO]   [TFT_D] batch 800/2385 loss=0.377833 grad_norm=nan
+2026-05-02 18:17:22,978 [INFO]   [TFT_D] batch 900/2385 loss=0.371668 grad_norm=nan
+2026-05-02 18:17:27,466 [INFO]   [TFT_D] batch 1000/2385 loss=0.375795 grad_norm=nan
+2026-05-02 18:17:31,973 [INFO]   [TFT_D] batch 1100/2385 loss=0.383930 grad_norm=nan
+2026-05-02 18:17:36,486 [INFO]   [TFT_D] batch 1200/2385 loss=0.379497 grad_norm=nan
+2026-05-02 18:17:40,988 [INFO]   [TFT_D] batch 1300/2385 loss=0.369208 grad_norm=nan
+2026-05-02 18:17:45,473 [INFO]   [TFT_D] batch 1400/2385 loss=0.374012 grad_norm=nan
+2026-05-02 18:17:49,986 [INFO]   [TFT_D] batch 1500/2385 loss=0.379800 grad_norm=nan
+2026-05-02 18:17:54,449 [INFO]   [TFT_D] batch 1600/2385 loss=0.376850 grad_norm=nan
+2026-05-02 18:17:58,950 [INFO]   [TFT_D] batch 1700/2385 loss=0.364951 grad_norm=nan
+2026-05-02 18:18:03,469 [INFO]   [TFT_D] batch 1800/2385 loss=0.377190 grad_norm=nan
+2026-05-02 18:18:07,971 [INFO]   [TFT_D] batch 1900/2385 loss=0.373958 grad_norm=nan
+2026-05-02 18:18:12,482 [INFO]   [TFT_D] batch 2000/2385 loss=0.371125 grad_norm=nan
+2026-05-02 18:18:16,980 [INFO]   [TFT_D] batch 2100/2385 loss=0.363687 grad_norm=nan
+2026-05-02 18:18:21,481 [INFO]   [TFT_D] batch 2200/2385 loss=0.373059 grad_norm=nan
+2026-05-02 18:18:26,000 [INFO]   [TFT_D] batch 2300/2385 loss=0.373645 grad_norm=nan
+2026-05-02 18:18:57,644 [INFO] [TFT_D] Epoch   7/20 | train=0.375832 | val=0.065153 | IC=0.0063 | RankIC=0.0078 | DirAcc=0.508 | lr=2.38e-04 | gn=nan | 135.7s
+2026-05-02 18:19:02,582 [INFO]   [TFT_D] batch 100/2385 loss=0.384333 grad_norm=0.0646
+2026-05-02 18:19:07,080 [INFO]   [TFT_D] batch 200/2385 loss=0.380236 grad_norm=inf
+2026-05-02 18:19:11,560 [INFO]   [TFT_D] batch 300/2385 loss=0.377878 grad_norm=nan
+2026-05-02 18:19:16,061 [INFO]   [TFT_D] batch 400/2385 loss=0.371643 grad_norm=nan
+2026-05-02 18:19:20,535 [INFO]   [TFT_D] batch 500/2385 loss=0.377337 grad_norm=nan
+2026-05-02 18:19:25,026 [INFO]   [TFT_D] batch 600/2385 loss=0.377367 grad_norm=nan
+2026-05-02 18:19:29,557 [INFO]   [TFT_D] batch 700/2385 loss=0.380805 grad_norm=nan
+2026-05-02 18:19:34,036 [INFO]   [TFT_D] batch 800/2385 loss=0.384893 grad_norm=nan
+2026-05-02 18:19:38,526 [INFO]   [TFT_D] batch 900/2385 loss=0.360182 grad_norm=nan
+2026-05-02 18:19:43,030 [INFO]   [TFT_D] batch 1000/2385 loss=0.383768 grad_norm=nan
+2026-05-02 18:19:47,513 [INFO]   [TFT_D] batch 1100/2385 loss=0.367248 grad_norm=nan
+2026-05-02 18:19:51,992 [INFO]   [TFT_D] batch 1200/2385 loss=0.378414 grad_norm=nan
+2026-05-02 18:19:56,492 [INFO]   [TFT_D] batch 1300/2385 loss=0.385309 grad_norm=nan
+2026-05-02 18:20:00,989 [INFO]   [TFT_D] batch 1400/2385 loss=0.365136 grad_norm=nan
+2026-05-02 18:20:05,488 [INFO]   [TFT_D] batch 1500/2385 loss=0.371740 grad_norm=nan
+2026-05-02 18:20:09,990 [INFO]   [TFT_D] batch 1600/2385 loss=0.377212 grad_norm=nan
+2026-05-02 18:20:14,505 [INFO]   [TFT_D] batch 1700/2385 loss=0.366515 grad_norm=nan
+2026-05-02 18:20:18,992 [INFO]   [TFT_D] batch 1800/2385 loss=0.377231 grad_norm=nan
+2026-05-02 18:20:23,496 [INFO]   [TFT_D] batch 1900/2385 loss=0.377742 grad_norm=nan
+2026-05-02 18:20:27,984 [INFO]   [TFT_D] batch 2000/2385 loss=0.366933 grad_norm=nan
+2026-05-02 18:20:32,473 [INFO]   [TFT_D] batch 2100/2385 loss=0.381220 grad_norm=nan
+2026-05-02 18:20:36,966 [INFO]   [TFT_D] batch 2200/2385 loss=0.379082 grad_norm=nan
+2026-05-02 18:20:41,430 [INFO]   [TFT_D] batch 2300/2385 loss=0.372527 grad_norm=nan
+2026-05-02 18:21:13,111 [INFO] [TFT_D] Epoch   8/20 | train=0.374886 | val=0.065333 | IC=-0.0027 | RankIC=0.0020 | DirAcc=0.502 | lr=2.18e-04 | gn=nan | 135.5s
+2026-05-02 18:21:18,061 [INFO]   [TFT_D] batch 100/2385 loss=0.373880 grad_norm=0.0743
+2026-05-02 18:21:22,576 [INFO]   [TFT_D] batch 200/2385 loss=0.387033 grad_norm=0.0738
+2026-05-02 18:21:27,077 [INFO]   [TFT_D] batch 300/2385 loss=0.381195 grad_norm=nan
+2026-05-02 18:21:31,577 [INFO]   [TFT_D] batch 400/2385 loss=0.382720 grad_norm=nan
+2026-05-02 18:21:36,063 [INFO]   [TFT_D] batch 500/2385 loss=0.381352 grad_norm=nan
+2026-05-02 18:21:40,527 [INFO]   [TFT_D] batch 600/2385 loss=0.378720 grad_norm=nan
+2026-05-02 18:21:45,021 [INFO]   [TFT_D] batch 700/2385 loss=0.363642 grad_norm=nan
+2026-05-02 18:21:49,514 [INFO]   [TFT_D] batch 800/2385 loss=0.366699 grad_norm=nan
+2026-05-02 18:21:54,000 [INFO]   [TFT_D] batch 900/2385 loss=0.365114 grad_norm=nan
+2026-05-02 18:21:58,482 [INFO]   [TFT_D] batch 1000/2385 loss=0.379382 grad_norm=nan
+2026-05-02 18:22:02,977 [INFO]   [TFT_D] batch 1100/2385 loss=0.366573 grad_norm=nan
+2026-05-02 18:22:07,500 [INFO]   [TFT_D] batch 1200/2385 loss=0.384689 grad_norm=nan
+2026-05-02 18:22:12,006 [INFO]   [TFT_D] batch 1300/2385 loss=0.372886 grad_norm=nan
+2026-05-02 18:22:16,502 [INFO]   [TFT_D] batch 1400/2385 loss=0.376449 grad_norm=nan
+2026-05-02 18:22:20,987 [INFO]   [TFT_D] batch 1500/2385 loss=0.363471 grad_norm=nan
+2026-05-02 18:22:25,475 [INFO]   [TFT_D] batch 1600/2385 loss=0.394946 grad_norm=nan
+2026-05-02 18:22:29,988 [INFO]   [TFT_D] batch 1700/2385 loss=0.380473 grad_norm=nan
+2026-05-02 18:22:34,479 [INFO]   [TFT_D] batch 1800/2385 loss=0.373942 grad_norm=nan
+2026-05-02 18:22:38,988 [INFO]   [TFT_D] batch 1900/2385 loss=0.379572 grad_norm=nan
+2026-05-02 18:22:43,498 [INFO]   [TFT_D] batch 2000/2385 loss=0.371448 grad_norm=nan
+2026-05-02 18:22:47,977 [INFO]   [TFT_D] batch 2100/2385 loss=0.368745 grad_norm=nan
+2026-05-02 18:22:52,497 [INFO]   [TFT_D] batch 2200/2385 loss=0.357693 grad_norm=nan
+2026-05-02 18:22:57,011 [INFO]   [TFT_D] batch 2300/2385 loss=0.366098 grad_norm=nan
+2026-05-02 18:23:28,820 [INFO] [TFT_D] Epoch   9/20 | train=0.373966 | val=0.066389 | IC=-0.0051 | RankIC=-0.0088 | DirAcc=0.497 | lr=1.97e-04 | gn=nan | 135.7s
+2026-05-02 18:23:28,820 [INFO]   Early stopping at epoch 9 (best IC=0.0117)
+2026-05-02 18:23:28,852 [INFO]   Training curve → results/wf_daily_only/window_3/TFT_D_history.csv
+2026-05-02 18:23:28,855 [INFO] 
+  Phase 3: Training meta model...
+2026-05-02 18:23:28,857 [WARNING]   No minute weights found — minute sub-models will be random init
+2026-05-02 18:23:28,859 [INFO] Collecting sub-model outputs for meta training...
+2026-05-02 18:23:28,859 [INFO] Sub-models frozen for meta training (2 models)
+2026-05-02 18:25:49,910 [INFO]   Meta align: 305313 union keys | matched: lstm_d=305280, tft_d=305280
+2026-05-02 18:27:00,538 [INFO]   Meta align: 166179 union keys | matched: lstm_d=166179, tft_d=166179
+2026-05-02 18:27:01,346 [INFO]   Meta train: 305,313 | val: 166,179
+2026-05-02 18:27:01,347 [INFO] 
+============================================================
+2026-05-02 18:27:01,347 [INFO] Training MetaMLP for 10 epochs (18,659 params)
+2026-05-02 18:27:01,347 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 18:27:01,347 [INFO] ============================================================
+2026-05-02 18:27:07,934 [INFO] [Meta] Epoch   1/10 | train=0.006944 | val=0.006804 | IC=0.0247 | RankIC=0.0065 | DirAcc=0.503 | 6.6s
+2026-05-02 18:27:07,935 [INFO]   ★ New best meta IC=0.0247 | val=0.006804
+2026-05-02 18:27:14,785 [INFO] [Meta] Epoch   2/10 | train=0.006916 | val=0.006815 | IC=0.0191 | RankIC=0.0113 | DirAcc=0.506 | 6.9s
+2026-05-02 18:27:21,423 [INFO] [Meta] Epoch   3/10 | train=0.006911 | val=0.006805 | IC=0.0159 | RankIC=0.0074 | DirAcc=0.508 | 6.6s
+2026-05-02 18:27:28,064 [INFO] [Meta] Epoch   4/10 | train=0.006908 | val=0.006844 | IC=0.0168 | RankIC=0.0055 | DirAcc=0.505 | 6.6s
+2026-05-02 18:27:34,693 [INFO] [Meta] Epoch   5/10 | train=0.006906 | val=0.006817 | IC=0.0180 | RankIC=0.0052 | DirAcc=0.505 | 6.6s
+2026-05-02 18:27:41,506 [INFO] [Meta] Epoch   6/10 | train=0.006904 | val=0.006832 | IC=0.0136 | RankIC=0.0031 | DirAcc=0.508 | 6.8s
+2026-05-02 18:27:41,506 [INFO]   Early stopping at epoch 6 (best IC=0.0247)
+2026-05-02 18:27:41,507 [INFO]   Training curve → results/wf_daily_only/window_3/Meta_history.csv
+2026-05-02 18:27:41,552 [INFO] 
+  Evaluating on validation set for IC weighting...
+2026-05-02 18:28:36,142 [INFO] 
+  Evaluating on test window...
+2026-05-02 18:29:53,232 [INFO] 
+  Window 3 results:
+2026-05-02 18:29:53,233 [INFO]     Val IC=0.0247 (for ensemble weighting)
+2026-05-02 18:29:53,233 [INFO]     Test IC=0.0324, RankIC=0.0122, DirAcc=0.503
+2026-05-02 18:29:53,233 [INFO]     L/S Sharpe=0.4984, MaxDD=-0.0990
+2026-05-02 18:29:53,233 [INFO]     Time: 2583s
+2026-05-02 18:29:53,245 [INFO] HierarchicalForecaster saved → results/wf_daily_only/window_3/fold_3_forecaster.pt
+2026-05-02 18:29:53,245 [INFO]   Saved fold model: results/wf_daily_only/window_3/fold_3_forecaster.pt
+2026-05-02 18:29:53,245 [INFO]   Computing attention prior from window 3 test set...
+2026-05-02 18:30:57,340 [INFO] Attention bias for window 3: {'lstm_d': 0.36, 'tft_d': 0.2971, 'lstm_m': -0.219, 'tft_m': -0.219, 'news': -0.219}
+2026-05-02 18:30:57,341 [INFO]   Attention prior updated for next window
+2026-05-02 18:30:57,341 [INFO] 
+######################################################################
+2026-05-02 18:30:57,341 [INFO] # WINDOW 4/5
+2026-05-02 18:30:57,341 [INFO] ######################################################################
+2026-05-02 18:35:18,785 [INFO]   Daily:  train=464871, val=234970, test=299394
+2026-05-02 18:35:18,792 [INFO]   Minute: train=0, val=0, test=1078522
+2026-05-02 18:35:18,794 [INFO]   Skipping sub-models: ['lstm_m', 'tft_m', 'news'] (use_minute=False, use_news=False)
+2026-05-02 18:35:18,999 [INFO] Hierarchical Forecaster parameter count:
+2026-05-02 18:35:18,999 [INFO]   lstm_d      :    256,529
+2026-05-02 18:35:19,000 [INFO]   tft_d       :    774,258
+2026-05-02 18:35:19,000 [INFO]   meta        :     18,659
+2026-05-02 18:35:19,000 [INFO]   TOTAL       :  1,049,446
+2026-05-02 18:35:19,092 [INFO]   Applying attention bias from window 3
+2026-05-02 18:35:19,094 [WARNING] Bias has 5 elements but forecaster has 2 sub-models. Truncating bias.
+2026-05-02 18:35:19,099 [INFO] MetaMLP attention bias applied: {'sub_0': 0.36, 'sub_1': 0.297}
+2026-05-02 18:35:19,102 [INFO] 
+  Phase 1: Training daily models...
+2026-05-02 18:35:19,146 [INFO]   [LSTM_D] torch.compile() enabled
+2026-05-02 18:35:19,151 [INFO]   [LSTM_D] lr=3.00e-04  wd=1.0e-04  grad_clip=1.0  warmup_steps=0  amp=True
+2026-05-02 18:35:19,258 [INFO] 
+============================================================
+2026-05-02 18:35:19,260 [INFO] Training LSTM_D for 20 epochs
+2026-05-02 18:35:19,260 [INFO]   Train batches: 3631, Val batches: 1836
+2026-05-02 18:35:19,260 [INFO]   Parameters: 256,529
+2026-05-02 18:35:19,260 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 18:35:19,260 [INFO] ============================================================
+2026-05-02 18:35:24,105 [INFO]   [LSTM_D] batch 100/3631 loss=0.390970 grad_norm=0.4272
+2026-05-02 18:35:26,780 [INFO]   [LSTM_D] batch 200/3631 loss=0.376879 grad_norm=0.3292
+2026-05-02 18:35:29,404 [INFO]   [LSTM_D] batch 300/3631 loss=0.377850 grad_norm=0.2674
+2026-05-02 18:35:32,073 [INFO]   [LSTM_D] batch 400/3631 loss=0.383134 grad_norm=0.2258
+2026-05-02 18:35:34,612 [INFO]   [LSTM_D] batch 500/3631 loss=0.378864 grad_norm=0.1992
+2026-05-02 18:35:37,199 [INFO]   [LSTM_D] batch 600/3631 loss=0.375210 grad_norm=0.1805
+2026-05-02 18:35:39,768 [INFO]   [LSTM_D] batch 700/3631 loss=0.376633 grad_norm=0.1651
+2026-05-02 18:35:42,335 [INFO]   [LSTM_D] batch 800/3631 loss=0.381927 grad_norm=0.1525
+2026-05-02 18:35:44,896 [INFO]   [LSTM_D] batch 900/3631 loss=0.376530 grad_norm=0.1420
+2026-05-02 18:35:47,467 [INFO]   [LSTM_D] batch 1000/3631 loss=0.382638 grad_norm=0.1338
+2026-05-02 18:35:50,045 [INFO]   [LSTM_D] batch 1100/3631 loss=0.380376 grad_norm=0.1263
+2026-05-02 18:35:52,591 [INFO]   [LSTM_D] batch 1200/3631 loss=0.374966 grad_norm=0.1199
+2026-05-02 18:35:55,142 [INFO]   [LSTM_D] batch 1300/3631 loss=0.377558 grad_norm=0.1144
+2026-05-02 18:35:57,716 [INFO]   [LSTM_D] batch 1400/3631 loss=0.379576 grad_norm=0.1097
+2026-05-02 18:36:00,315 [INFO]   [LSTM_D] batch 1500/3631 loss=0.382719 grad_norm=0.1055
+2026-05-02 18:36:02,896 [INFO]   [LSTM_D] batch 1600/3631 loss=0.380583 grad_norm=0.1017
+2026-05-02 18:36:05,480 [INFO]   [LSTM_D] batch 1700/3631 loss=0.373185 grad_norm=0.0984
+2026-05-02 18:36:08,091 [INFO]   [LSTM_D] batch 1800/3631 loss=0.382807 grad_norm=0.0954
+2026-05-02 18:36:10,638 [INFO]   [LSTM_D] batch 1900/3631 loss=0.381422 grad_norm=0.0925
+2026-05-02 18:36:13,207 [INFO]   [LSTM_D] batch 2000/3631 loss=0.382300 grad_norm=0.0897
+2026-05-02 18:36:15,789 [INFO]   [LSTM_D] batch 2100/3631 loss=0.378624 grad_norm=0.0875
+2026-05-02 18:36:18,368 [INFO]   [LSTM_D] batch 2200/3631 loss=0.379270 grad_norm=0.0854
+2026-05-02 18:36:20,940 [INFO]   [LSTM_D] batch 2300/3631 loss=0.382374 grad_norm=0.0832
+2026-05-02 18:36:23,514 [INFO]   [LSTM_D] batch 2400/3631 loss=0.375692 grad_norm=0.0815
+2026-05-02 18:36:26,104 [INFO]   [LSTM_D] batch 2500/3631 loss=0.379798 grad_norm=0.0798
+2026-05-02 18:36:28,661 [INFO]   [LSTM_D] batch 2600/3631 loss=0.381873 grad_norm=inf
+2026-05-02 18:36:31,238 [INFO]   [LSTM_D] batch 2700/3631 loss=0.377796 grad_norm=inf
+2026-05-02 18:36:33,792 [INFO]   [LSTM_D] batch 2800/3631 loss=0.375152 grad_norm=inf
+2026-05-02 18:36:36,365 [INFO]   [LSTM_D] batch 2900/3631 loss=0.375696 grad_norm=inf
+2026-05-02 18:36:38,956 [INFO]   [LSTM_D] batch 3000/3631 loss=0.376696 grad_norm=inf
+2026-05-02 18:36:41,565 [INFO]   [LSTM_D] batch 3100/3631 loss=0.380972 grad_norm=inf
+2026-05-02 18:36:44,156 [INFO]   [LSTM_D] batch 3200/3631 loss=0.381606 grad_norm=inf
+2026-05-02 18:36:46,727 [INFO]   [LSTM_D] batch 3300/3631 loss=0.375954 grad_norm=inf
+2026-05-02 18:36:49,319 [INFO]   [LSTM_D] batch 3400/3631 loss=0.376928 grad_norm=inf
+2026-05-02 18:36:51,910 [INFO]   [LSTM_D] batch 3500/3631 loss=0.381727 grad_norm=inf
+2026-05-02 18:36:54,480 [INFO]   [LSTM_D] batch 3600/3631 loss=0.371585 grad_norm=inf
+2026-05-02 18:37:33,784 [INFO] [LSTM_D] Epoch   1/20 | train=0.379183 | val=0.069633 | IC=0.0031 | RankIC=0.0108 | DirAcc=0.504 | lr=3.00e-04 | gn=inf | 134.5s
+2026-05-02 18:37:33,795 [INFO]   ★ New best IC=0.0031 | val_loss=0.069633
+2026-05-02 18:37:36,824 [INFO]   [LSTM_D] batch 100/3631 loss=0.384666 grad_norm=inf
+2026-05-02 18:37:39,448 [INFO]   [LSTM_D] batch 200/3631 loss=0.381818 grad_norm=inf
+2026-05-02 18:37:42,036 [INFO]   [LSTM_D] batch 300/3631 loss=0.377219 grad_norm=inf
+2026-05-02 18:37:44,632 [INFO]   [LSTM_D] batch 400/3631 loss=0.373897 grad_norm=inf
+2026-05-02 18:37:47,210 [INFO]   [LSTM_D] batch 500/3631 loss=0.374139 grad_norm=inf
+2026-05-02 18:37:49,829 [INFO]   [LSTM_D] batch 600/3631 loss=0.384824 grad_norm=inf
+2026-05-02 18:37:52,389 [INFO]   [LSTM_D] batch 700/3631 loss=0.374997 grad_norm=inf
+2026-05-02 18:37:54,931 [INFO]   [LSTM_D] batch 800/3631 loss=0.383679 grad_norm=inf
+2026-05-02 18:37:57,485 [INFO]   [LSTM_D] batch 900/3631 loss=0.382227 grad_norm=inf
+2026-05-02 18:38:00,038 [INFO]   [LSTM_D] batch 1000/3631 loss=0.377433 grad_norm=inf
+2026-05-02 18:38:02,617 [INFO]   [LSTM_D] batch 1100/3631 loss=0.380374 grad_norm=inf
+2026-05-02 18:38:05,202 [INFO]   [LSTM_D] batch 1200/3631 loss=0.385553 grad_norm=inf
+2026-05-02 18:38:07,765 [INFO]   [LSTM_D] batch 1300/3631 loss=0.382947 grad_norm=inf
+2026-05-02 18:38:10,335 [INFO]   [LSTM_D] batch 1400/3631 loss=0.381185 grad_norm=inf
+2026-05-02 18:38:12,903 [INFO]   [LSTM_D] batch 1500/3631 loss=0.377984 grad_norm=inf
+2026-05-02 18:38:15,501 [INFO]   [LSTM_D] batch 1600/3631 loss=0.377539 grad_norm=inf
+2026-05-02 18:38:18,062 [INFO]   [LSTM_D] batch 1700/3631 loss=0.382373 grad_norm=inf
+2026-05-02 18:38:20,611 [INFO]   [LSTM_D] batch 1800/3631 loss=0.380148 grad_norm=inf
+2026-05-02 18:38:23,190 [INFO]   [LSTM_D] batch 1900/3631 loss=0.379259 grad_norm=inf
+2026-05-02 18:38:25,774 [INFO]   [LSTM_D] batch 2000/3631 loss=0.376559 grad_norm=inf
+2026-05-02 18:38:28,361 [INFO]   [LSTM_D] batch 2100/3631 loss=0.378937 grad_norm=inf
+2026-05-02 18:38:30,942 [INFO]   [LSTM_D] batch 2200/3631 loss=0.375378 grad_norm=inf
+2026-05-02 18:38:33,497 [INFO]   [LSTM_D] batch 2300/3631 loss=0.377411 grad_norm=inf
+2026-05-02 18:38:36,046 [INFO]   [LSTM_D] batch 2400/3631 loss=0.375222 grad_norm=inf
+2026-05-02 18:38:38,599 [INFO]   [LSTM_D] batch 2500/3631 loss=0.374571 grad_norm=inf
+2026-05-02 18:38:41,177 [INFO]   [LSTM_D] batch 2600/3631 loss=0.373668 grad_norm=inf
+2026-05-02 18:38:43,741 [INFO]   [LSTM_D] batch 2700/3631 loss=0.376327 grad_norm=inf
+2026-05-02 18:38:46,311 [INFO]   [LSTM_D] batch 2800/3631 loss=0.380614 grad_norm=inf
+2026-05-02 18:38:48,886 [INFO]   [LSTM_D] batch 2900/3631 loss=0.374557 grad_norm=inf
+2026-05-02 18:38:51,463 [INFO]   [LSTM_D] batch 3000/3631 loss=0.379253 grad_norm=inf
+2026-05-02 18:38:54,035 [INFO]   [LSTM_D] batch 3100/3631 loss=0.380994 grad_norm=inf
+2026-05-02 18:38:56,602 [INFO]   [LSTM_D] batch 3200/3631 loss=0.380584 grad_norm=inf
+2026-05-02 18:38:59,160 [INFO]   [LSTM_D] batch 3300/3631 loss=0.380908 grad_norm=inf
+2026-05-02 18:39:01,718 [INFO]   [LSTM_D] batch 3400/3631 loss=0.369882 grad_norm=inf
+2026-05-02 18:39:04,274 [INFO]   [LSTM_D] batch 3500/3631 loss=0.379828 grad_norm=inf
+2026-05-02 18:39:06,836 [INFO]   [LSTM_D] batch 3600/3631 loss=0.383774 grad_norm=inf
+2026-05-02 18:39:45,475 [INFO] [LSTM_D] Epoch   2/20 | train=0.378532 | val=0.069686 | IC=0.0094 | RankIC=0.0134 | DirAcc=0.506 | lr=2.98e-04 | gn=inf | 131.7s
+2026-05-02 18:39:45,478 [INFO]   ★ New best IC=0.0094 | val_loss=0.069686
+2026-05-02 18:39:48,524 [INFO]   [LSTM_D] batch 100/3631 loss=0.381783 grad_norm=inf
+2026-05-02 18:39:51,076 [INFO]   [LSTM_D] batch 200/3631 loss=0.371828 grad_norm=inf
+2026-05-02 18:39:53,607 [INFO]   [LSTM_D] batch 300/3631 loss=0.383200 grad_norm=inf
+2026-05-02 18:39:56,188 [INFO]   [LSTM_D] batch 400/3631 loss=0.378387 grad_norm=inf
+2026-05-02 18:39:58,737 [INFO]   [LSTM_D] batch 500/3631 loss=0.372168 grad_norm=inf
+2026-05-02 18:40:01,298 [INFO]   [LSTM_D] batch 600/3631 loss=0.378248 grad_norm=inf
+2026-05-02 18:40:03,854 [INFO]   [LSTM_D] batch 700/3631 loss=0.372122 grad_norm=inf
+2026-05-02 18:40:06,487 [INFO]   [LSTM_D] batch 800/3631 loss=0.381975 grad_norm=inf
+2026-05-02 18:40:09,066 [INFO]   [LSTM_D] batch 900/3631 loss=0.374816 grad_norm=inf
+2026-05-02 18:40:11,670 [INFO]   [LSTM_D] batch 1000/3631 loss=0.375283 grad_norm=inf
+2026-05-02 18:40:14,269 [INFO]   [LSTM_D] batch 1100/3631 loss=0.376565 grad_norm=inf
+2026-05-02 18:40:16,839 [INFO]   [LSTM_D] batch 1200/3631 loss=0.368947 grad_norm=inf
+2026-05-02 18:40:19,414 [INFO]   [LSTM_D] batch 1300/3631 loss=0.383190 grad_norm=inf
+2026-05-02 18:40:21,948 [INFO]   [LSTM_D] batch 1400/3631 loss=0.383620 grad_norm=inf
+2026-05-02 18:40:24,511 [INFO]   [LSTM_D] batch 1500/3631 loss=0.376391 grad_norm=inf
+2026-05-02 18:40:27,043 [INFO]   [LSTM_D] batch 1600/3631 loss=0.382496 grad_norm=inf
+2026-05-02 18:40:29,604 [INFO]   [LSTM_D] batch 1700/3631 loss=0.377444 grad_norm=inf
+2026-05-02 18:40:32,159 [INFO]   [LSTM_D] batch 1800/3631 loss=0.376659 grad_norm=inf
+2026-05-02 18:40:34,730 [INFO]   [LSTM_D] batch 1900/3631 loss=0.374135 grad_norm=inf
+2026-05-02 18:40:37,271 [INFO]   [LSTM_D] batch 2000/3631 loss=0.384058 grad_norm=inf
+2026-05-02 18:40:39,822 [INFO]   [LSTM_D] batch 2100/3631 loss=0.381306 grad_norm=inf
+2026-05-02 18:40:42,361 [INFO]   [LSTM_D] batch 2200/3631 loss=0.390138 grad_norm=inf
+2026-05-02 18:40:44,898 [INFO]   [LSTM_D] batch 2300/3631 loss=0.376137 grad_norm=inf
+2026-05-02 18:40:47,453 [INFO]   [LSTM_D] batch 2400/3631 loss=0.368985 grad_norm=inf
+2026-05-02 18:40:49,965 [INFO]   [LSTM_D] batch 2500/3631 loss=0.375378 grad_norm=inf
+2026-05-02 18:40:52,478 [INFO]   [LSTM_D] batch 2600/3631 loss=0.375238 grad_norm=inf
+2026-05-02 18:40:55,019 [INFO]   [LSTM_D] batch 2700/3631 loss=0.377514 grad_norm=inf
+2026-05-02 18:40:57,583 [INFO]   [LSTM_D] batch 2800/3631 loss=0.378333 grad_norm=inf
+2026-05-02 18:41:00,112 [INFO]   [LSTM_D] batch 2900/3631 loss=0.380200 grad_norm=inf
+2026-05-02 18:41:02,644 [INFO]   [LSTM_D] batch 3000/3631 loss=0.378952 grad_norm=inf
+2026-05-02 18:41:05,179 [INFO]   [LSTM_D] batch 3100/3631 loss=0.378226 grad_norm=inf
+2026-05-02 18:41:07,723 [INFO]   [LSTM_D] batch 3200/3631 loss=0.384185 grad_norm=inf
+2026-05-02 18:41:10,298 [INFO]   [LSTM_D] batch 3300/3631 loss=0.384366 grad_norm=inf
+2026-05-02 18:41:12,810 [INFO]   [LSTM_D] batch 3400/3631 loss=0.379602 grad_norm=inf
+2026-05-02 18:41:15,346 [INFO]   [LSTM_D] batch 3500/3631 loss=0.375081 grad_norm=inf
+2026-05-02 18:41:17,894 [INFO]   [LSTM_D] batch 3600/3631 loss=0.375096 grad_norm=inf
+2026-05-02 18:41:56,625 [INFO] [LSTM_D] Epoch   3/20 | train=0.377843 | val=0.069702 | IC=0.0167 | RankIC=0.0219 | DirAcc=0.506 | lr=2.93e-04 | gn=inf | 131.1s
+2026-05-02 18:41:56,627 [INFO]   ★ New best IC=0.0167 | val_loss=0.069702
+2026-05-02 18:41:59,633 [INFO]   [LSTM_D] batch 100/3631 loss=0.378800 grad_norm=inf
+2026-05-02 18:42:02,182 [INFO]   [LSTM_D] batch 200/3631 loss=0.380276 grad_norm=inf
+2026-05-02 18:42:04,727 [INFO]   [LSTM_D] batch 300/3631 loss=0.376384 grad_norm=inf
+2026-05-02 18:42:07,271 [INFO]   [LSTM_D] batch 400/3631 loss=0.375892 grad_norm=inf
+2026-05-02 18:42:09,811 [INFO]   [LSTM_D] batch 500/3631 loss=0.373998 grad_norm=inf
+2026-05-02 18:42:12,337 [INFO]   [LSTM_D] batch 600/3631 loss=0.378746 grad_norm=inf
+2026-05-02 18:42:14,895 [INFO]   [LSTM_D] batch 700/3631 loss=0.380162 grad_norm=inf
+2026-05-02 18:42:17,443 [INFO]   [LSTM_D] batch 800/3631 loss=0.365500 grad_norm=inf
+2026-05-02 18:42:19,954 [INFO]   [LSTM_D] batch 900/3631 loss=0.371523 grad_norm=inf
+2026-05-02 18:42:22,457 [INFO]   [LSTM_D] batch 1000/3631 loss=0.379153 grad_norm=inf
+2026-05-02 18:42:24,980 [INFO]   [LSTM_D] batch 1100/3631 loss=0.385306 grad_norm=inf
+2026-05-02 18:42:27,545 [INFO]   [LSTM_D] batch 1200/3631 loss=0.382311 grad_norm=inf
+2026-05-02 18:42:30,094 [INFO]   [LSTM_D] batch 1300/3631 loss=0.373883 grad_norm=inf
+2026-05-02 18:42:32,659 [INFO]   [LSTM_D] batch 1400/3631 loss=0.392792 grad_norm=inf
+2026-05-02 18:42:35,215 [INFO]   [LSTM_D] batch 1500/3631 loss=0.375277 grad_norm=inf
+2026-05-02 18:42:37,761 [INFO]   [LSTM_D] batch 1600/3631 loss=0.372432 grad_norm=inf
+2026-05-02 18:42:40,273 [INFO]   [LSTM_D] batch 1700/3631 loss=0.379867 grad_norm=inf
+2026-05-02 18:42:42,806 [INFO]   [LSTM_D] batch 1800/3631 loss=0.379149 grad_norm=inf
+2026-05-02 18:42:45,321 [INFO]   [LSTM_D] batch 1900/3631 loss=0.372011 grad_norm=inf
+2026-05-02 18:42:47,848 [INFO]   [LSTM_D] batch 2000/3631 loss=0.371681 grad_norm=inf
+2026-05-02 18:42:50,366 [INFO]   [LSTM_D] batch 2100/3631 loss=0.380746 grad_norm=inf
+2026-05-02 18:42:52,889 [INFO]   [LSTM_D] batch 2200/3631 loss=0.374290 grad_norm=inf
+2026-05-02 18:42:55,434 [INFO]   [LSTM_D] batch 2300/3631 loss=0.378257 grad_norm=inf
+2026-05-02 18:42:57,971 [INFO]   [LSTM_D] batch 2400/3631 loss=0.378744 grad_norm=inf
+2026-05-02 18:43:00,464 [INFO]   [LSTM_D] batch 2500/3631 loss=0.377954 grad_norm=inf
+2026-05-02 18:43:03,005 [INFO]   [LSTM_D] batch 2600/3631 loss=0.376076 grad_norm=inf
+2026-05-02 18:43:05,527 [INFO]   [LSTM_D] batch 2700/3631 loss=0.375309 grad_norm=inf
+2026-05-02 18:43:08,036 [INFO]   [LSTM_D] batch 2800/3631 loss=0.380926 grad_norm=inf
+2026-05-02 18:43:10,567 [INFO]   [LSTM_D] batch 2900/3631 loss=0.377224 grad_norm=inf
+2026-05-02 18:43:13,094 [INFO]   [LSTM_D] batch 3000/3631 loss=0.387602 grad_norm=inf
+2026-05-02 18:43:15,619 [INFO]   [LSTM_D] batch 3100/3631 loss=0.367898 grad_norm=inf
+2026-05-02 18:43:18,161 [INFO]   [LSTM_D] batch 3200/3631 loss=0.375967 grad_norm=inf
+2026-05-02 18:43:20,703 [INFO]   [LSTM_D] batch 3300/3631 loss=0.372926 grad_norm=inf
+2026-05-02 18:43:23,247 [INFO]   [LSTM_D] batch 3400/3631 loss=0.376205 grad_norm=inf
+2026-05-02 18:43:25,836 [INFO]   [LSTM_D] batch 3500/3631 loss=0.381127 grad_norm=inf
+2026-05-02 18:43:28,416 [INFO]   [LSTM_D] batch 3600/3631 loss=0.371688 grad_norm=inf
+2026-05-02 18:44:07,089 [INFO] [LSTM_D] Epoch   4/20 | train=0.376359 | val=0.070243 | IC=0.0120 | RankIC=0.0167 | DirAcc=0.504 | lr=2.84e-04 | gn=inf | 130.5s
+2026-05-02 18:44:10,122 [INFO]   [LSTM_D] batch 100/3631 loss=0.376360 grad_norm=inf
+2026-05-02 18:44:12,678 [INFO]   [LSTM_D] batch 200/3631 loss=0.376892 grad_norm=inf
+2026-05-02 18:44:15,224 [INFO]   [LSTM_D] batch 300/3631 loss=0.381471 grad_norm=inf
+2026-05-02 18:44:17,799 [INFO]   [LSTM_D] batch 400/3631 loss=0.370472 grad_norm=inf
+2026-05-02 18:44:20,356 [INFO]   [LSTM_D] batch 500/3631 loss=0.371021 grad_norm=inf
+2026-05-02 18:44:22,894 [INFO]   [LSTM_D] batch 600/3631 loss=0.378915 grad_norm=inf
+2026-05-02 18:44:25,452 [INFO]   [LSTM_D] batch 700/3631 loss=0.388956 grad_norm=inf
+2026-05-02 18:44:28,001 [INFO]   [LSTM_D] batch 800/3631 loss=0.375640 grad_norm=inf
+2026-05-02 18:44:30,519 [INFO]   [LSTM_D] batch 900/3631 loss=0.394419 grad_norm=inf
+2026-05-02 18:44:33,054 [INFO]   [LSTM_D] batch 1000/3631 loss=0.370955 grad_norm=inf
+2026-05-02 18:44:35,575 [INFO]   [LSTM_D] batch 1100/3631 loss=0.369934 grad_norm=inf
+2026-05-02 18:44:38,128 [INFO]   [LSTM_D] batch 1200/3631 loss=0.371256 grad_norm=inf
+2026-05-02 18:44:40,687 [INFO]   [LSTM_D] batch 1300/3631 loss=0.380760 grad_norm=inf
+2026-05-02 18:44:43,236 [INFO]   [LSTM_D] batch 1400/3631 loss=0.393013 grad_norm=inf
+2026-05-02 18:44:45,775 [INFO]   [LSTM_D] batch 1500/3631 loss=0.364864 grad_norm=inf
+2026-05-02 18:44:48,311 [INFO]   [LSTM_D] batch 1600/3631 loss=0.355823 grad_norm=inf
+2026-05-02 18:44:50,875 [INFO]   [LSTM_D] batch 1700/3631 loss=0.372712 grad_norm=inf
+2026-05-02 18:44:53,442 [INFO]   [LSTM_D] batch 1800/3631 loss=0.376024 grad_norm=inf
+2026-05-02 18:44:56,002 [INFO]   [LSTM_D] batch 1900/3631 loss=0.376464 grad_norm=inf
+2026-05-02 18:44:58,572 [INFO]   [LSTM_D] batch 2000/3631 loss=0.370948 grad_norm=inf
+2026-05-02 18:45:01,125 [INFO]   [LSTM_D] batch 2100/3631 loss=0.373236 grad_norm=inf
+2026-05-02 18:45:03,665 [INFO]   [LSTM_D] batch 2200/3631 loss=0.369825 grad_norm=inf
+2026-05-02 18:45:06,203 [INFO]   [LSTM_D] batch 2300/3631 loss=0.377791 grad_norm=inf
+2026-05-02 18:45:08,738 [INFO]   [LSTM_D] batch 2400/3631 loss=0.375463 grad_norm=inf
+2026-05-02 18:45:11,292 [INFO]   [LSTM_D] batch 2500/3631 loss=0.369446 grad_norm=inf
+2026-05-02 18:45:13,849 [INFO]   [LSTM_D] batch 2600/3631 loss=0.369960 grad_norm=inf
+2026-05-02 18:45:16,388 [INFO]   [LSTM_D] batch 2700/3631 loss=0.371929 grad_norm=inf
+2026-05-02 18:45:18,951 [INFO]   [LSTM_D] batch 2800/3631 loss=0.365328 grad_norm=inf
+2026-05-02 18:45:21,532 [INFO]   [LSTM_D] batch 2900/3631 loss=0.374879 grad_norm=inf
+2026-05-02 18:45:24,075 [INFO]   [LSTM_D] batch 3000/3631 loss=0.363472 grad_norm=inf
+2026-05-02 18:45:26,655 [INFO]   [LSTM_D] batch 3100/3631 loss=0.376000 grad_norm=inf
+2026-05-02 18:45:29,217 [INFO]   [LSTM_D] batch 3200/3631 loss=0.367728 grad_norm=inf
+2026-05-02 18:45:31,748 [INFO]   [LSTM_D] batch 3300/3631 loss=0.379075 grad_norm=inf
+2026-05-02 18:45:34,259 [INFO]   [LSTM_D] batch 3400/3631 loss=0.370205 grad_norm=inf
+2026-05-02 18:45:36,787 [INFO]   [LSTM_D] batch 3500/3631 loss=0.372722 grad_norm=inf
+2026-05-02 18:45:39,306 [INFO]   [LSTM_D] batch 3600/3631 loss=0.368927 grad_norm=inf
+2026-05-02 18:46:18,130 [INFO] [LSTM_D] Epoch   5/20 | train=0.373446 | val=0.070331 | IC=0.0194 | RankIC=0.0270 | DirAcc=0.509 | lr=2.71e-04 | gn=inf | 131.0s
+2026-05-02 18:46:18,133 [INFO]   ★ New best IC=0.0194 | val_loss=0.070331
+2026-05-02 18:46:21,160 [INFO]   [LSTM_D] batch 100/3631 loss=0.365489 grad_norm=inf
+2026-05-02 18:46:23,726 [INFO]   [LSTM_D] batch 200/3631 loss=0.373777 grad_norm=inf
+2026-05-02 18:46:26,265 [INFO]   [LSTM_D] batch 300/3631 loss=0.380747 grad_norm=inf
+2026-05-02 18:46:28,818 [INFO]   [LSTM_D] batch 400/3631 loss=0.381434 grad_norm=inf
+2026-05-02 18:46:31,316 [INFO]   [LSTM_D] batch 500/3631 loss=0.354889 grad_norm=inf
+2026-05-02 18:46:33,840 [INFO]   [LSTM_D] batch 600/3631 loss=0.365839 grad_norm=inf
+2026-05-02 18:46:36,351 [INFO]   [LSTM_D] batch 700/3631 loss=0.384235 grad_norm=inf
+2026-05-02 18:46:38,930 [INFO]   [LSTM_D] batch 800/3631 loss=0.369853 grad_norm=inf
+2026-05-02 18:46:41,476 [INFO]   [LSTM_D] batch 900/3631 loss=0.370626 grad_norm=inf
+2026-05-02 18:46:44,004 [INFO]   [LSTM_D] batch 1000/3631 loss=0.367739 grad_norm=inf
+2026-05-02 18:46:46,542 [INFO]   [LSTM_D] batch 1100/3631 loss=0.369367 grad_norm=inf
+2026-05-02 18:46:49,100 [INFO]   [LSTM_D] batch 1200/3631 loss=0.377162 grad_norm=inf
+2026-05-02 18:46:51,670 [INFO]   [LSTM_D] batch 1300/3631 loss=0.375110 grad_norm=inf
+2026-05-02 18:46:54,202 [INFO]   [LSTM_D] batch 1400/3631 loss=0.380035 grad_norm=inf
+2026-05-02 18:46:56,761 [INFO]   [LSTM_D] batch 1500/3631 loss=0.375528 grad_norm=inf
+2026-05-02 18:46:59,309 [INFO]   [LSTM_D] batch 1600/3631 loss=0.371620 grad_norm=inf
+2026-05-02 18:47:01,849 [INFO]   [LSTM_D] batch 1700/3631 loss=0.375029 grad_norm=inf
+2026-05-02 18:47:04,374 [INFO]   [LSTM_D] batch 1800/3631 loss=0.384822 grad_norm=inf
+2026-05-02 18:47:06,941 [INFO]   [LSTM_D] batch 1900/3631 loss=0.379956 grad_norm=inf
+2026-05-02 18:47:09,468 [INFO]   [LSTM_D] batch 2000/3631 loss=0.370359 grad_norm=inf
+2026-05-02 18:47:11,997 [INFO]   [LSTM_D] batch 2100/3631 loss=0.374542 grad_norm=inf
+2026-05-02 18:47:14,587 [INFO]   [LSTM_D] batch 2200/3631 loss=0.382667 grad_norm=inf
+2026-05-02 18:47:17,127 [INFO]   [LSTM_D] batch 2300/3631 loss=0.366862 grad_norm=inf
+2026-05-02 18:47:19,677 [INFO]   [LSTM_D] batch 2400/3631 loss=0.375965 grad_norm=inf
+2026-05-02 18:47:22,210 [INFO]   [LSTM_D] batch 2500/3631 loss=0.379128 grad_norm=inf
+2026-05-02 18:47:24,736 [INFO]   [LSTM_D] batch 2600/3631 loss=0.362216 grad_norm=inf
+2026-05-02 18:47:27,263 [INFO]   [LSTM_D] batch 2700/3631 loss=0.361914 grad_norm=inf
+2026-05-02 18:47:29,800 [INFO]   [LSTM_D] batch 2800/3631 loss=0.371019 grad_norm=inf
+2026-05-02 18:47:32,328 [INFO]   [LSTM_D] batch 2900/3631 loss=0.364245 grad_norm=inf
+2026-05-02 18:47:34,855 [INFO]   [LSTM_D] batch 3000/3631 loss=0.362923 grad_norm=inf
+2026-05-02 18:47:37,367 [INFO]   [LSTM_D] batch 3100/3631 loss=0.371893 grad_norm=inf
+2026-05-02 18:47:39,904 [INFO]   [LSTM_D] batch 3200/3631 loss=0.367764 grad_norm=inf
+2026-05-02 18:47:42,469 [INFO]   [LSTM_D] batch 3300/3631 loss=0.368522 grad_norm=inf
+2026-05-02 18:47:45,021 [INFO]   [LSTM_D] batch 3400/3631 loss=0.380588 grad_norm=inf
+2026-05-02 18:47:47,538 [INFO]   [LSTM_D] batch 3500/3631 loss=0.377021 grad_norm=inf
+2026-05-02 18:47:50,072 [INFO]   [LSTM_D] batch 3600/3631 loss=0.383257 grad_norm=inf
+2026-05-02 18:48:28,936 [INFO] [LSTM_D] Epoch   6/20 | train=0.370413 | val=0.070322 | IC=0.0060 | RankIC=0.0197 | DirAcc=0.508 | lr=2.56e-04 | gn=inf | 130.8s
+2026-05-02 18:48:31,953 [INFO]   [LSTM_D] batch 100/3631 loss=0.358206 grad_norm=inf
+2026-05-02 18:48:34,549 [INFO]   [LSTM_D] batch 200/3631 loss=0.352451 grad_norm=inf
+2026-05-02 18:48:37,100 [INFO]   [LSTM_D] batch 300/3631 loss=0.380609 grad_norm=inf
+2026-05-02 18:48:39,681 [INFO]   [LSTM_D] batch 400/3631 loss=0.367298 grad_norm=inf
+2026-05-02 18:48:42,198 [INFO]   [LSTM_D] batch 500/3631 loss=0.382530 grad_norm=inf
+2026-05-02 18:48:44,725 [INFO]   [LSTM_D] batch 600/3631 loss=0.358336 grad_norm=inf
+2026-05-02 18:48:47,266 [INFO]   [LSTM_D] batch 700/3631 loss=0.371647 grad_norm=inf
+2026-05-02 18:48:49,809 [INFO]   [LSTM_D] batch 800/3631 loss=0.371159 grad_norm=inf
+2026-05-02 18:48:52,367 [INFO]   [LSTM_D] batch 900/3631 loss=0.362226 grad_norm=inf
+2026-05-02 18:48:54,921 [INFO]   [LSTM_D] batch 1000/3631 loss=0.362055 grad_norm=inf
+2026-05-02 18:48:57,481 [INFO]   [LSTM_D] batch 1100/3631 loss=0.380087 grad_norm=inf
+2026-05-02 18:49:00,027 [INFO]   [LSTM_D] batch 1200/3631 loss=0.365429 grad_norm=inf
+2026-05-02 18:49:02,556 [INFO]   [LSTM_D] batch 1300/3631 loss=0.367399 grad_norm=inf
+2026-05-02 18:49:05,083 [INFO]   [LSTM_D] batch 1400/3631 loss=0.364313 grad_norm=inf
+2026-05-02 18:49:07,599 [INFO]   [LSTM_D] batch 1500/3631 loss=0.373512 grad_norm=inf
+2026-05-02 18:49:10,129 [INFO]   [LSTM_D] batch 1600/3631 loss=0.373945 grad_norm=inf
+2026-05-02 18:49:12,678 [INFO]   [LSTM_D] batch 1700/3631 loss=0.373514 grad_norm=inf
+2026-05-02 18:49:15,224 [INFO]   [LSTM_D] batch 1800/3631 loss=0.370778 grad_norm=inf
+2026-05-02 18:49:17,772 [INFO]   [LSTM_D] batch 1900/3631 loss=0.363051 grad_norm=inf
+2026-05-02 18:49:20,331 [INFO]   [LSTM_D] batch 2000/3631 loss=0.375312 grad_norm=inf
+2026-05-02 18:49:22,887 [INFO]   [LSTM_D] batch 2100/3631 loss=0.369411 grad_norm=inf
+2026-05-02 18:49:25,428 [INFO]   [LSTM_D] batch 2200/3631 loss=0.365716 grad_norm=inf
+2026-05-02 18:49:27,940 [INFO]   [LSTM_D] batch 2300/3631 loss=0.368778 grad_norm=inf
+2026-05-02 18:49:30,472 [INFO]   [LSTM_D] batch 2400/3631 loss=0.370804 grad_norm=inf
+2026-05-02 18:49:33,001 [INFO]   [LSTM_D] batch 2500/3631 loss=0.362900 grad_norm=inf
+2026-05-02 18:49:35,536 [INFO]   [LSTM_D] batch 2600/3631 loss=0.361132 grad_norm=inf
+2026-05-02 18:49:38,078 [INFO]   [LSTM_D] batch 2700/3631 loss=0.357361 grad_norm=inf
+2026-05-02 18:49:40,635 [INFO]   [LSTM_D] batch 2800/3631 loss=0.372595 grad_norm=inf
+2026-05-02 18:49:43,157 [INFO]   [LSTM_D] batch 2900/3631 loss=0.373240 grad_norm=inf
+2026-05-02 18:49:45,683 [INFO]   [LSTM_D] batch 3000/3631 loss=0.364152 grad_norm=inf
+2026-05-02 18:49:48,231 [INFO]   [LSTM_D] batch 3100/3631 loss=0.381266 grad_norm=inf
+2026-05-02 18:49:50,755 [INFO]   [LSTM_D] batch 3200/3631 loss=0.362205 grad_norm=inf
+2026-05-02 18:49:53,291 [INFO]   [LSTM_D] batch 3300/3631 loss=0.368579 grad_norm=inf
+2026-05-02 18:49:55,830 [INFO]   [LSTM_D] batch 3400/3631 loss=0.351404 grad_norm=inf
+2026-05-02 18:49:58,383 [INFO]   [LSTM_D] batch 3500/3631 loss=0.381578 grad_norm=inf
+2026-05-02 18:50:00,914 [INFO]   [LSTM_D] batch 3600/3631 loss=0.365382 grad_norm=inf
+2026-05-02 18:50:39,746 [INFO] [LSTM_D] Epoch   7/20 | train=0.367576 | val=0.070312 | IC=0.0042 | RankIC=0.0209 | DirAcc=0.508 | lr=2.38e-04 | gn=inf | 130.8s
+2026-05-02 18:50:42,759 [INFO]   [LSTM_D] batch 100/3631 loss=0.380173 grad_norm=inf
+2026-05-02 18:50:45,338 [INFO]   [LSTM_D] batch 200/3631 loss=0.366461 grad_norm=inf
+2026-05-02 18:50:47,885 [INFO]   [LSTM_D] batch 300/3631 loss=0.374935 grad_norm=inf
+2026-05-02 18:50:50,459 [INFO]   [LSTM_D] batch 400/3631 loss=0.369102 grad_norm=inf
+2026-05-02 18:50:52,977 [INFO]   [LSTM_D] batch 500/3631 loss=0.366396 grad_norm=inf
+2026-05-02 18:50:55,544 [INFO]   [LSTM_D] batch 600/3631 loss=0.364788 grad_norm=inf
+2026-05-02 18:50:58,082 [INFO]   [LSTM_D] batch 700/3631 loss=0.355730 grad_norm=inf
+2026-05-02 18:51:00,603 [INFO]   [LSTM_D] batch 800/3631 loss=0.364559 grad_norm=inf
+2026-05-02 18:51:03,169 [INFO]   [LSTM_D] batch 900/3631 loss=0.368409 grad_norm=inf
+2026-05-02 18:51:05,737 [INFO]   [LSTM_D] batch 1000/3631 loss=0.379242 grad_norm=inf
+2026-05-02 18:51:08,296 [INFO]   [LSTM_D] batch 1100/3631 loss=0.355948 grad_norm=inf
+2026-05-02 18:51:10,840 [INFO]   [LSTM_D] batch 1200/3631 loss=0.381610 grad_norm=inf
+2026-05-02 18:51:13,425 [INFO]   [LSTM_D] batch 1300/3631 loss=0.380857 grad_norm=inf
+2026-05-02 18:51:15,980 [INFO]   [LSTM_D] batch 1400/3631 loss=0.363784 grad_norm=inf
+2026-05-02 18:51:18,523 [INFO]   [LSTM_D] batch 1500/3631 loss=0.375076 grad_norm=inf
+2026-05-02 18:51:21,107 [INFO]   [LSTM_D] batch 1600/3631 loss=0.376416 grad_norm=inf
+2026-05-02 18:51:23,657 [INFO]   [LSTM_D] batch 1700/3631 loss=0.369888 grad_norm=inf
+2026-05-02 18:51:26,210 [INFO]   [LSTM_D] batch 1800/3631 loss=0.360456 grad_norm=inf
+2026-05-02 18:51:28,751 [INFO]   [LSTM_D] batch 1900/3631 loss=0.380416 grad_norm=inf
+2026-05-02 18:51:31,288 [INFO]   [LSTM_D] batch 2000/3631 loss=0.377261 grad_norm=inf
+2026-05-02 18:51:33,822 [INFO]   [LSTM_D] batch 2100/3631 loss=0.352411 grad_norm=inf
+2026-05-02 18:51:36,344 [INFO]   [LSTM_D] batch 2200/3631 loss=0.379115 grad_norm=inf
+2026-05-02 18:51:38,887 [INFO]   [LSTM_D] batch 2300/3631 loss=0.372325 grad_norm=inf
+2026-05-02 18:51:41,425 [INFO]   [LSTM_D] batch 2400/3631 loss=0.348741 grad_norm=inf
+2026-05-02 18:51:43,979 [INFO]   [LSTM_D] batch 2500/3631 loss=0.364832 grad_norm=inf
+2026-05-02 18:51:46,564 [INFO]   [LSTM_D] batch 2600/3631 loss=0.363214 grad_norm=inf
+2026-05-02 18:51:49,110 [INFO]   [LSTM_D] batch 2700/3631 loss=0.363389 grad_norm=inf
+2026-05-02 18:51:51,665 [INFO]   [LSTM_D] batch 2800/3631 loss=0.374656 grad_norm=inf
+2026-05-02 18:51:54,246 [INFO]   [LSTM_D] batch 2900/3631 loss=0.376642 grad_norm=inf
+2026-05-02 18:51:56,833 [INFO]   [LSTM_D] batch 3000/3631 loss=0.353287 grad_norm=inf
+2026-05-02 18:51:59,415 [INFO]   [LSTM_D] batch 3100/3631 loss=0.367329 grad_norm=inf
+2026-05-02 18:52:01,973 [INFO]   [LSTM_D] batch 3200/3631 loss=0.358286 grad_norm=inf
+2026-05-02 18:52:04,521 [INFO]   [LSTM_D] batch 3300/3631 loss=0.370900 grad_norm=inf
+2026-05-02 18:52:07,075 [INFO]   [LSTM_D] batch 3400/3631 loss=0.371245 grad_norm=inf
+2026-05-02 18:52:09,607 [INFO]   [LSTM_D] batch 3500/3631 loss=0.362221 grad_norm=inf
+2026-05-02 18:52:12,139 [INFO]   [LSTM_D] batch 3600/3631 loss=0.375295 grad_norm=inf
+2026-05-02 18:52:50,807 [INFO] [LSTM_D] Epoch   8/20 | train=0.364830 | val=0.070257 | IC=-0.0077 | RankIC=0.0219 | DirAcc=0.510 | lr=2.18e-04 | gn=inf | 131.1s
+2026-05-02 18:52:53,837 [INFO]   [LSTM_D] batch 100/3631 loss=0.370261 grad_norm=inf
+2026-05-02 18:52:56,391 [INFO]   [LSTM_D] batch 200/3631 loss=0.357825 grad_norm=inf
+2026-05-02 18:52:58,936 [INFO]   [LSTM_D] batch 300/3631 loss=0.356029 grad_norm=inf
+2026-05-02 18:53:01,509 [INFO]   [LSTM_D] batch 400/3631 loss=0.365764 grad_norm=inf
+2026-05-02 18:53:04,050 [INFO]   [LSTM_D] batch 500/3631 loss=0.357265 grad_norm=inf
+2026-05-02 18:53:06,564 [INFO]   [LSTM_D] batch 600/3631 loss=0.362593 grad_norm=inf
+2026-05-02 18:53:09,101 [INFO]   [LSTM_D] batch 700/3631 loss=0.345903 grad_norm=inf
+2026-05-02 18:53:11,667 [INFO]   [LSTM_D] batch 800/3631 loss=0.362964 grad_norm=inf
+2026-05-02 18:53:14,218 [INFO]   [LSTM_D] batch 900/3631 loss=0.353620 grad_norm=inf
+2026-05-02 18:53:16,764 [INFO]   [LSTM_D] batch 1000/3631 loss=0.373985 grad_norm=inf
+2026-05-02 18:53:19,323 [INFO]   [LSTM_D] batch 1100/3631 loss=0.375212 grad_norm=inf
+2026-05-02 18:53:21,863 [INFO]   [LSTM_D] batch 1200/3631 loss=0.371558 grad_norm=inf
+2026-05-02 18:53:24,436 [INFO]   [LSTM_D] batch 1300/3631 loss=0.374693 grad_norm=inf
+2026-05-02 18:53:26,973 [INFO]   [LSTM_D] batch 1400/3631 loss=0.360339 grad_norm=inf
+2026-05-02 18:53:29,510 [INFO]   [LSTM_D] batch 1500/3631 loss=0.349457 grad_norm=inf
+2026-05-02 18:53:32,059 [INFO]   [LSTM_D] batch 1600/3631 loss=0.369756 grad_norm=inf
+2026-05-02 18:53:34,613 [INFO]   [LSTM_D] batch 1700/3631 loss=0.362850 grad_norm=inf
+2026-05-02 18:53:37,173 [INFO]   [LSTM_D] batch 1800/3631 loss=0.343023 grad_norm=inf
+2026-05-02 18:53:39,732 [INFO]   [LSTM_D] batch 1900/3631 loss=0.369527 grad_norm=inf
+2026-05-02 18:53:42,288 [INFO]   [LSTM_D] batch 2000/3631 loss=0.356236 grad_norm=inf
+2026-05-02 18:53:44,827 [INFO]   [LSTM_D] batch 2100/3631 loss=0.339781 grad_norm=inf
+2026-05-02 18:53:47,381 [INFO]   [LSTM_D] batch 2200/3631 loss=0.350879 grad_norm=inf
+2026-05-02 18:53:49,924 [INFO]   [LSTM_D] batch 2300/3631 loss=0.384663 grad_norm=inf
+2026-05-02 18:53:52,450 [INFO]   [LSTM_D] batch 2400/3631 loss=0.365050 grad_norm=inf
+2026-05-02 18:53:54,971 [INFO]   [LSTM_D] batch 2500/3631 loss=0.356993 grad_norm=inf
+2026-05-02 18:53:57,501 [INFO]   [LSTM_D] batch 2600/3631 loss=0.360619 grad_norm=inf
+2026-05-02 18:54:00,041 [INFO]   [LSTM_D] batch 2700/3631 loss=0.356549 grad_norm=inf
+2026-05-02 18:54:02,567 [INFO]   [LSTM_D] batch 2800/3631 loss=0.358409 grad_norm=inf
+2026-05-02 18:54:05,110 [INFO]   [LSTM_D] batch 2900/3631 loss=0.356540 grad_norm=inf
+2026-05-02 18:54:07,656 [INFO]   [LSTM_D] batch 3000/3631 loss=0.362974 grad_norm=inf
+2026-05-02 18:54:10,224 [INFO]   [LSTM_D] batch 3100/3631 loss=0.356305 grad_norm=inf
+2026-05-02 18:54:12,785 [INFO]   [LSTM_D] batch 3200/3631 loss=0.354456 grad_norm=inf
+2026-05-02 18:54:15,338 [INFO]   [LSTM_D] batch 3300/3631 loss=0.362441 grad_norm=inf
+2026-05-02 18:54:17,866 [INFO]   [LSTM_D] batch 3400/3631 loss=0.356248 grad_norm=inf
+2026-05-02 18:54:20,388 [INFO]   [LSTM_D] batch 3500/3631 loss=0.350843 grad_norm=inf
+2026-05-02 18:54:22,907 [INFO]   [LSTM_D] batch 3600/3631 loss=0.357302 grad_norm=inf
+2026-05-02 18:55:01,757 [INFO] [LSTM_D] Epoch   9/20 | train=0.362318 | val=0.070649 | IC=0.0029 | RankIC=0.0235 | DirAcc=0.511 | lr=1.97e-04 | gn=inf | 130.9s
+2026-05-02 18:55:04,798 [INFO]   [LSTM_D] batch 100/3631 loss=0.349564 grad_norm=0.1803
+2026-05-02 18:55:07,374 [INFO]   [LSTM_D] batch 200/3631 loss=0.355008 grad_norm=inf
+2026-05-02 18:55:09,954 [INFO]   [LSTM_D] batch 300/3631 loss=0.379148 grad_norm=inf
+2026-05-02 18:55:12,530 [INFO]   [LSTM_D] batch 400/3631 loss=0.367811 grad_norm=inf
+2026-05-02 18:55:15,071 [INFO]   [LSTM_D] batch 500/3631 loss=0.372525 grad_norm=inf
+2026-05-02 18:55:17,608 [INFO]   [LSTM_D] batch 600/3631 loss=0.357024 grad_norm=inf
+2026-05-02 18:55:20,148 [INFO]   [LSTM_D] batch 700/3631 loss=0.364891 grad_norm=inf
+2026-05-02 18:55:22,678 [INFO]   [LSTM_D] batch 800/3631 loss=0.332852 grad_norm=inf
+2026-05-02 18:55:25,210 [INFO]   [LSTM_D] batch 900/3631 loss=0.347535 grad_norm=inf
+2026-05-02 18:55:27,730 [INFO]   [LSTM_D] batch 1000/3631 loss=0.359798 grad_norm=inf
+2026-05-02 18:55:30,246 [INFO]   [LSTM_D] batch 1100/3631 loss=0.336037 grad_norm=inf
+2026-05-02 18:55:32,791 [INFO]   [LSTM_D] batch 1200/3631 loss=0.357330 grad_norm=inf
+2026-05-02 18:55:35,334 [INFO]   [LSTM_D] batch 1300/3631 loss=0.354728 grad_norm=inf
+2026-05-02 18:55:37,879 [INFO]   [LSTM_D] batch 1400/3631 loss=0.349052 grad_norm=inf
+2026-05-02 18:55:40,402 [INFO]   [LSTM_D] batch 1500/3631 loss=0.358692 grad_norm=inf
+2026-05-02 18:55:42,981 [INFO]   [LSTM_D] batch 1600/3631 loss=0.354308 grad_norm=inf
+2026-05-02 18:55:45,520 [INFO]   [LSTM_D] batch 1700/3631 loss=0.338784 grad_norm=inf
+2026-05-02 18:55:48,092 [INFO]   [LSTM_D] batch 1800/3631 loss=0.349749 grad_norm=inf
+2026-05-02 18:55:50,648 [INFO]   [LSTM_D] batch 1900/3631 loss=0.359741 grad_norm=inf
+2026-05-02 18:55:53,215 [INFO]   [LSTM_D] batch 2000/3631 loss=0.348996 grad_norm=inf
+2026-05-02 18:55:55,793 [INFO]   [LSTM_D] batch 2100/3631 loss=0.376031 grad_norm=inf
+2026-05-02 18:55:58,365 [INFO]   [LSTM_D] batch 2200/3631 loss=0.373860 grad_norm=inf
+2026-05-02 18:56:00,871 [INFO]   [LSTM_D] batch 2300/3631 loss=0.368706 grad_norm=inf
+2026-05-02 18:56:03,421 [INFO]   [LSTM_D] batch 2400/3631 loss=0.353709 grad_norm=inf
+2026-05-02 18:56:05,965 [INFO]   [LSTM_D] batch 2500/3631 loss=0.356263 grad_norm=inf
+2026-05-02 18:56:08,515 [INFO]   [LSTM_D] batch 2600/3631 loss=0.343053 grad_norm=inf
+2026-05-02 18:56:11,070 [INFO]   [LSTM_D] batch 2700/3631 loss=0.358901 grad_norm=inf
+2026-05-02 18:56:13,613 [INFO]   [LSTM_D] batch 2800/3631 loss=0.366147 grad_norm=inf
+2026-05-02 18:56:16,170 [INFO]   [LSTM_D] batch 2900/3631 loss=0.383769 grad_norm=inf
+2026-05-02 18:56:18,726 [INFO]   [LSTM_D] batch 3000/3631 loss=0.356653 grad_norm=inf
+2026-05-02 18:56:21,272 [INFO]   [LSTM_D] batch 3100/3631 loss=0.367803 grad_norm=inf
+2026-05-02 18:56:23,830 [INFO]   [LSTM_D] batch 3200/3631 loss=0.364397 grad_norm=inf
+2026-05-02 18:56:26,385 [INFO]   [LSTM_D] batch 3300/3631 loss=0.358646 grad_norm=inf
+2026-05-02 18:56:28,927 [INFO]   [LSTM_D] batch 3400/3631 loss=0.346745 grad_norm=inf
+2026-05-02 18:56:31,442 [INFO]   [LSTM_D] batch 3500/3631 loss=0.361891 grad_norm=inf
+2026-05-02 18:56:33,969 [INFO]   [LSTM_D] batch 3600/3631 loss=0.365041 grad_norm=inf
+2026-05-02 18:57:12,645 [INFO] [LSTM_D] Epoch  10/20 | train=0.360061 | val=0.070942 | IC=0.0026 | RankIC=0.0227 | DirAcc=0.508 | lr=1.74e-04 | gn=inf | 130.9s
+2026-05-02 18:57:12,645 [INFO]   Early stopping at epoch 10 (best IC=0.0194)
+2026-05-02 18:57:12,657 [INFO]   Training curve → results/wf_daily_only/window_4/LSTM_D_history.csv
+2026-05-02 18:57:12,660 [INFO]   [TFT_D] torch.compile() enabled
+2026-05-02 18:57:12,660 [INFO]   [TFT_D] lr=3.00e-04  wd=1.0e-05  grad_clip=1.0  warmup_steps=0  amp=True
+2026-05-02 18:57:12,661 [INFO] 
+============================================================
+2026-05-02 18:57:12,661 [INFO] Training TFT_D for 20 epochs
+2026-05-02 18:57:12,661 [INFO]   Train batches: 3631, Val batches: 1836
+2026-05-02 18:57:12,661 [INFO]   Parameters: 774,258
+2026-05-02 18:57:12,661 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 18:57:12,661 [INFO] ============================================================
+2026-05-02 18:57:17,670 [INFO]   [TFT_D] batch 100/3631 loss=0.382941 grad_norm=1.3458
+2026-05-02 18:57:22,160 [INFO]   [TFT_D] batch 200/3631 loss=0.384597 grad_norm=0.8333
+2026-05-02 18:57:26,655 [INFO]   [TFT_D] batch 300/3631 loss=0.380222 grad_norm=0.6345
+2026-05-02 18:57:31,121 [INFO]   [TFT_D] batch 400/3631 loss=0.383341 grad_norm=0.5219
+2026-05-02 18:57:35,586 [INFO]   [TFT_D] batch 500/3631 loss=0.382670 grad_norm=0.4504
+2026-05-02 18:57:40,037 [INFO]   [TFT_D] batch 600/3631 loss=0.380912 grad_norm=0.3978
+2026-05-02 18:57:44,499 [INFO]   [TFT_D] batch 700/3631 loss=0.382945 grad_norm=0.3582
+2026-05-02 18:57:48,949 [INFO]   [TFT_D] batch 800/3631 loss=0.378635 grad_norm=0.3278
+2026-05-02 18:57:53,425 [INFO]   [TFT_D] batch 900/3631 loss=0.382326 grad_norm=0.3032
+2026-05-02 18:57:57,879 [INFO]   [TFT_D] batch 1000/3631 loss=0.379757 grad_norm=0.2833
+2026-05-02 18:58:02,340 [INFO]   [TFT_D] batch 1100/3631 loss=0.376385 grad_norm=0.2668
+2026-05-02 18:58:06,799 [INFO]   [TFT_D] batch 1200/3631 loss=0.376514 grad_norm=0.2523
+2026-05-02 18:58:11,262 [INFO]   [TFT_D] batch 1300/3631 loss=0.382619 grad_norm=0.2399
+2026-05-02 18:58:15,717 [INFO]   [TFT_D] batch 1400/3631 loss=0.377559 grad_norm=0.2295
+2026-05-02 18:58:20,130 [INFO]   [TFT_D] batch 1500/3631 loss=0.376679 grad_norm=0.2201
+2026-05-02 18:58:24,588 [INFO]   [TFT_D] batch 1600/3631 loss=0.386679 grad_norm=0.2117
+2026-05-02 18:58:29,018 [INFO]   [TFT_D] batch 1700/3631 loss=0.377118 grad_norm=0.2045
+2026-05-02 18:58:33,470 [INFO]   [TFT_D] batch 1800/3631 loss=0.384281 grad_norm=0.1978
+2026-05-02 18:58:37,912 [INFO]   [TFT_D] batch 1900/3631 loss=0.375817 grad_norm=0.1921
+2026-05-02 18:58:42,384 [INFO]   [TFT_D] batch 2000/3631 loss=0.385441 grad_norm=0.1863
+2026-05-02 18:58:46,835 [INFO]   [TFT_D] batch 2100/3631 loss=0.378721 grad_norm=0.1813
+2026-05-02 18:58:51,296 [INFO]   [TFT_D] batch 2200/3631 loss=0.383524 grad_norm=0.1766
+2026-05-02 18:58:55,762 [INFO]   [TFT_D] batch 2300/3631 loss=0.373435 grad_norm=inf
+2026-05-02 18:59:00,221 [INFO]   [TFT_D] batch 2400/3631 loss=0.376829 grad_norm=inf
+2026-05-02 18:59:04,672 [INFO]   [TFT_D] batch 2500/3631 loss=0.380984 grad_norm=inf
+2026-05-02 18:59:09,094 [INFO]   [TFT_D] batch 2600/3631 loss=0.374798 grad_norm=inf
+2026-05-02 18:59:13,518 [INFO]   [TFT_D] batch 2700/3631 loss=0.377794 grad_norm=inf
+2026-05-02 18:59:17,971 [INFO]   [TFT_D] batch 2800/3631 loss=0.379607 grad_norm=inf
+2026-05-02 18:59:22,415 [INFO]   [TFT_D] batch 2900/3631 loss=0.378476 grad_norm=inf
+2026-05-02 18:59:26,849 [INFO]   [TFT_D] batch 3000/3631 loss=0.379067 grad_norm=inf
+2026-05-02 18:59:31,312 [INFO]   [TFT_D] batch 3100/3631 loss=0.383091 grad_norm=inf
+2026-05-02 18:59:35,762 [INFO]   [TFT_D] batch 3200/3631 loss=0.373871 grad_norm=inf
+2026-05-02 18:59:40,226 [INFO]   [TFT_D] batch 3300/3631 loss=0.373989 grad_norm=inf
+2026-05-02 18:59:44,675 [INFO]   [TFT_D] batch 3400/3631 loss=0.377844 grad_norm=inf
+2026-05-02 18:59:49,079 [INFO]   [TFT_D] batch 3500/3631 loss=0.383929 grad_norm=inf
+2026-05-02 18:59:53,502 [INFO]   [TFT_D] batch 3600/3631 loss=0.374278 grad_norm=nan
+2026-05-02 19:00:33,467 [INFO] [TFT_D] Epoch   1/20 | train=0.379566 | val=0.070144 | IC=0.0091 | RankIC=0.0162 | DirAcc=0.504 | lr=3.00e-04 | gn=nan | 200.8s
+2026-05-02 19:00:33,483 [INFO]   ★ New best IC=0.0091 | val_loss=0.070144
+2026-05-02 19:00:38,422 [INFO]   [TFT_D] batch 100/3631 loss=0.378078 grad_norm=0.0686
+2026-05-02 19:00:42,888 [INFO]   [TFT_D] batch 200/3631 loss=0.379096 grad_norm=0.0689
+2026-05-02 19:00:47,343 [INFO]   [TFT_D] batch 300/3631 loss=0.375361 grad_norm=0.0685
+2026-05-02 19:00:51,824 [INFO]   [TFT_D] batch 400/3631 loss=0.375075 grad_norm=nan
+2026-05-02 19:00:56,276 [INFO]   [TFT_D] batch 500/3631 loss=0.374135 grad_norm=nan
+2026-05-02 19:01:00,732 [INFO]   [TFT_D] batch 600/3631 loss=0.374476 grad_norm=nan
+2026-05-02 19:01:05,177 [INFO]   [TFT_D] batch 700/3631 loss=0.379679 grad_norm=nan
+2026-05-02 19:01:09,615 [INFO]   [TFT_D] batch 800/3631 loss=0.380293 grad_norm=nan
+2026-05-02 19:01:14,059 [INFO]   [TFT_D] batch 900/3631 loss=0.377072 grad_norm=nan
+2026-05-02 19:01:18,512 [INFO]   [TFT_D] batch 1000/3631 loss=0.378982 grad_norm=nan
+2026-05-02 19:01:22,965 [INFO]   [TFT_D] batch 1100/3631 loss=0.377089 grad_norm=nan
+2026-05-02 19:01:27,427 [INFO]   [TFT_D] batch 1200/3631 loss=0.386751 grad_norm=nan
+2026-05-02 19:01:31,882 [INFO]   [TFT_D] batch 1300/3631 loss=0.379112 grad_norm=nan
+2026-05-02 19:01:36,323 [INFO]   [TFT_D] batch 1400/3631 loss=0.378270 grad_norm=nan
+2026-05-02 19:01:40,772 [INFO]   [TFT_D] batch 1500/3631 loss=0.383675 grad_norm=nan
+2026-05-02 19:01:45,203 [INFO]   [TFT_D] batch 1600/3631 loss=0.376591 grad_norm=nan
+2026-05-02 19:01:49,653 [INFO]   [TFT_D] batch 1700/3631 loss=0.380396 grad_norm=nan
+2026-05-02 19:01:54,098 [INFO]   [TFT_D] batch 1800/3631 loss=0.391472 grad_norm=nan
+2026-05-02 19:01:58,548 [INFO]   [TFT_D] batch 1900/3631 loss=0.371850 grad_norm=nan
+2026-05-02 19:02:02,989 [INFO]   [TFT_D] batch 2000/3631 loss=0.371110 grad_norm=nan
+2026-05-02 19:02:07,412 [INFO]   [TFT_D] batch 2100/3631 loss=0.379392 grad_norm=nan
+2026-05-02 19:02:11,848 [INFO]   [TFT_D] batch 2200/3631 loss=0.377412 grad_norm=nan
+2026-05-02 19:02:16,298 [INFO]   [TFT_D] batch 2300/3631 loss=0.378859 grad_norm=nan
+2026-05-02 19:02:20,733 [INFO]   [TFT_D] batch 2400/3631 loss=0.376731 grad_norm=nan
+2026-05-02 19:02:25,181 [INFO]   [TFT_D] batch 2500/3631 loss=0.385586 grad_norm=nan
+2026-05-02 19:02:29,620 [INFO]   [TFT_D] batch 2600/3631 loss=0.383317 grad_norm=nan
+2026-05-02 19:02:34,058 [INFO]   [TFT_D] batch 2700/3631 loss=0.379507 grad_norm=nan
+2026-05-02 19:02:38,480 [INFO]   [TFT_D] batch 2800/3631 loss=0.379233 grad_norm=nan
+2026-05-02 19:02:42,911 [INFO]   [TFT_D] batch 2900/3631 loss=0.369109 grad_norm=nan
+2026-05-02 19:02:47,346 [INFO]   [TFT_D] batch 3000/3631 loss=0.374849 grad_norm=nan
+2026-05-02 19:02:51,789 [INFO]   [TFT_D] batch 3100/3631 loss=0.379345 grad_norm=nan
+2026-05-02 19:02:56,246 [INFO]   [TFT_D] batch 3200/3631 loss=0.381880 grad_norm=nan
+2026-05-02 19:03:00,688 [INFO]   [TFT_D] batch 3300/3631 loss=0.374168 grad_norm=nan
+2026-05-02 19:03:05,139 [INFO]   [TFT_D] batch 3400/3631 loss=0.381733 grad_norm=nan
+2026-05-02 19:03:09,569 [INFO]   [TFT_D] batch 3500/3631 loss=0.372947 grad_norm=nan
+2026-05-02 19:03:14,041 [INFO]   [TFT_D] batch 3600/3631 loss=0.369385 grad_norm=nan
+2026-05-02 19:03:53,935 [INFO] [TFT_D] Epoch   2/20 | train=0.377467 | val=0.070377 | IC=0.0134 | RankIC=0.0139 | DirAcc=0.508 | lr=2.98e-04 | gn=nan | 200.5s
+2026-05-02 19:03:53,949 [INFO]   ★ New best IC=0.0134 | val_loss=0.070377
+2026-05-02 19:03:58,869 [INFO]   [TFT_D] batch 100/3631 loss=0.369672 grad_norm=inf
+2026-05-02 19:04:03,323 [INFO]   [TFT_D] batch 200/3631 loss=0.379955 grad_norm=inf
+2026-05-02 19:04:07,771 [INFO]   [TFT_D] batch 300/3631 loss=0.379018 grad_norm=nan
+2026-05-02 19:04:12,209 [INFO]   [TFT_D] batch 400/3631 loss=0.359823 grad_norm=nan
+2026-05-02 19:04:16,661 [INFO]   [TFT_D] batch 500/3631 loss=0.375422 grad_norm=nan
+2026-05-02 19:04:21,086 [INFO]   [TFT_D] batch 600/3631 loss=0.364792 grad_norm=nan
+2026-05-02 19:04:25,546 [INFO]   [TFT_D] batch 700/3631 loss=0.378638 grad_norm=nan
+2026-05-02 19:04:29,974 [INFO]   [TFT_D] batch 800/3631 loss=0.371368 grad_norm=nan
+2026-05-02 19:04:34,408 [INFO]   [TFT_D] batch 900/3631 loss=0.383504 grad_norm=nan
+2026-05-02 19:04:38,848 [INFO]   [TFT_D] batch 1000/3631 loss=0.380129 grad_norm=nan
+2026-05-02 19:04:43,289 [INFO]   [TFT_D] batch 1100/3631 loss=0.368775 grad_norm=nan
+2026-05-02 19:04:47,741 [INFO]   [TFT_D] batch 1200/3631 loss=0.381639 grad_norm=nan
+2026-05-02 19:04:52,163 [INFO]   [TFT_D] batch 1300/3631 loss=0.377937 grad_norm=nan
+2026-05-02 19:04:56,600 [INFO]   [TFT_D] batch 1400/3631 loss=0.365489 grad_norm=nan
+2026-05-02 19:05:01,055 [INFO]   [TFT_D] batch 1500/3631 loss=0.374498 grad_norm=nan
+2026-05-02 19:05:05,498 [INFO]   [TFT_D] batch 1600/3631 loss=0.377931 grad_norm=nan
+2026-05-02 19:05:09,932 [INFO]   [TFT_D] batch 1700/3631 loss=0.373249 grad_norm=nan
+2026-05-02 19:05:14,385 [INFO]   [TFT_D] batch 1800/3631 loss=0.373260 grad_norm=nan
+2026-05-02 19:05:18,825 [INFO]   [TFT_D] batch 1900/3631 loss=0.375123 grad_norm=nan
+2026-05-02 19:05:23,257 [INFO]   [TFT_D] batch 2000/3631 loss=0.386679 grad_norm=nan
+2026-05-02 19:05:27,702 [INFO]   [TFT_D] batch 2100/3631 loss=0.376165 grad_norm=nan
+2026-05-02 19:05:32,145 [INFO]   [TFT_D] batch 2200/3631 loss=0.374332 grad_norm=nan
+2026-05-02 19:05:36,573 [INFO]   [TFT_D] batch 2300/3631 loss=0.377640 grad_norm=nan
+2026-05-02 19:05:41,015 [INFO]   [TFT_D] batch 2400/3631 loss=0.375383 grad_norm=nan
+2026-05-02 19:05:45,456 [INFO]   [TFT_D] batch 2500/3631 loss=0.370682 grad_norm=nan
+2026-05-02 19:05:49,901 [INFO]   [TFT_D] batch 2600/3631 loss=0.370249 grad_norm=nan
+2026-05-02 19:05:54,339 [INFO]   [TFT_D] batch 2700/3631 loss=0.377592 grad_norm=nan
+2026-05-02 19:05:58,770 [INFO]   [TFT_D] batch 2800/3631 loss=0.368504 grad_norm=nan
+2026-05-02 19:06:03,213 [INFO]   [TFT_D] batch 2900/3631 loss=0.375359 grad_norm=nan
+2026-05-02 19:06:07,625 [INFO]   [TFT_D] batch 3000/3631 loss=0.389680 grad_norm=nan
+2026-05-02 19:06:12,056 [INFO]   [TFT_D] batch 3100/3631 loss=0.370299 grad_norm=nan
+2026-05-02 19:06:16,464 [INFO]   [TFT_D] batch 3200/3631 loss=0.370022 grad_norm=nan
+2026-05-02 19:06:20,886 [INFO]   [TFT_D] batch 3300/3631 loss=0.379029 grad_norm=nan
+2026-05-02 19:06:25,327 [INFO]   [TFT_D] batch 3400/3631 loss=0.397520 grad_norm=nan
+2026-05-02 19:06:29,750 [INFO]   [TFT_D] batch 3500/3631 loss=0.376150 grad_norm=nan
+2026-05-02 19:06:34,172 [INFO]   [TFT_D] batch 3600/3631 loss=0.373780 grad_norm=nan
+2026-05-02 19:07:13,991 [INFO] [TFT_D] Epoch   3/20 | train=0.375466 | val=0.070246 | IC=0.0084 | RankIC=0.0102 | DirAcc=0.504 | lr=2.93e-04 | gn=nan | 200.0s
+2026-05-02 19:07:18,909 [INFO]   [TFT_D] batch 100/3631 loss=0.377290 grad_norm=0.0686
+2026-05-02 19:07:23,391 [INFO]   [TFT_D] batch 200/3631 loss=0.358966 grad_norm=nan
+2026-05-02 19:07:27,867 [INFO]   [TFT_D] batch 300/3631 loss=0.379313 grad_norm=nan
+2026-05-02 19:07:32,335 [INFO]   [TFT_D] batch 400/3631 loss=0.373734 grad_norm=nan
+2026-05-02 19:07:36,781 [INFO]   [TFT_D] batch 500/3631 loss=0.374198 grad_norm=nan
+2026-05-02 19:07:41,228 [INFO]   [TFT_D] batch 600/3631 loss=0.373219 grad_norm=nan
+2026-05-02 19:07:45,672 [INFO]   [TFT_D] batch 700/3631 loss=0.366819 grad_norm=nan
+2026-05-02 19:07:50,132 [INFO]   [TFT_D] batch 800/3631 loss=0.377678 grad_norm=nan
+2026-05-02 19:07:54,570 [INFO]   [TFT_D] batch 900/3631 loss=0.366273 grad_norm=nan
+2026-05-02 19:07:58,993 [INFO]   [TFT_D] batch 1000/3631 loss=0.380327 grad_norm=nan
+2026-05-02 19:08:03,458 [INFO]   [TFT_D] batch 1100/3631 loss=0.367016 grad_norm=nan
+2026-05-02 19:08:07,910 [INFO]   [TFT_D] batch 1200/3631 loss=0.376176 grad_norm=nan
+2026-05-02 19:08:12,371 [INFO]   [TFT_D] batch 1300/3631 loss=0.369148 grad_norm=nan
+2026-05-02 19:08:16,825 [INFO]   [TFT_D] batch 1400/3631 loss=0.374892 grad_norm=nan
+2026-05-02 19:08:21,267 [INFO]   [TFT_D] batch 1500/3631 loss=0.370300 grad_norm=nan
+2026-05-02 19:08:25,675 [INFO]   [TFT_D] batch 1600/3631 loss=0.355011 grad_norm=nan
+2026-05-02 19:08:30,110 [INFO]   [TFT_D] batch 1700/3631 loss=0.380326 grad_norm=nan
+2026-05-02 19:08:34,542 [INFO]   [TFT_D] batch 1800/3631 loss=0.372192 grad_norm=nan
+2026-05-02 19:08:38,980 [INFO]   [TFT_D] batch 1900/3631 loss=0.364794 grad_norm=nan
+2026-05-02 19:08:43,411 [INFO]   [TFT_D] batch 2000/3631 loss=0.381772 grad_norm=nan
+2026-05-02 19:08:47,881 [INFO]   [TFT_D] batch 2100/3631 loss=0.373408 grad_norm=nan
+2026-05-02 19:08:52,340 [INFO]   [TFT_D] batch 2200/3631 loss=0.376318 grad_norm=nan
+2026-05-02 19:08:56,805 [INFO]   [TFT_D] batch 2300/3631 loss=0.383720 grad_norm=nan
+2026-05-02 19:09:01,252 [INFO]   [TFT_D] batch 2400/3631 loss=0.384375 grad_norm=nan
+2026-05-02 19:09:05,695 [INFO]   [TFT_D] batch 2500/3631 loss=0.370325 grad_norm=nan
+2026-05-02 19:09:10,141 [INFO]   [TFT_D] batch 2600/3631 loss=0.389070 grad_norm=nan
+2026-05-02 19:09:14,612 [INFO]   [TFT_D] batch 2700/3631 loss=0.364529 grad_norm=nan
+2026-05-02 19:09:19,118 [INFO]   [TFT_D] batch 2800/3631 loss=0.369977 grad_norm=nan
+2026-05-02 19:09:23,575 [INFO]   [TFT_D] batch 2900/3631 loss=0.369444 grad_norm=nan
+2026-05-02 19:09:28,024 [INFO]   [TFT_D] batch 3000/3631 loss=0.373736 grad_norm=nan
+2026-05-02 19:09:32,470 [INFO]   [TFT_D] batch 3100/3631 loss=0.367289 grad_norm=nan
+2026-05-02 19:09:36,933 [INFO]   [TFT_D] batch 3200/3631 loss=0.365929 grad_norm=nan
+2026-05-02 19:09:41,404 [INFO]   [TFT_D] batch 3300/3631 loss=0.376361 grad_norm=nan
+2026-05-02 19:09:45,888 [INFO]   [TFT_D] batch 3400/3631 loss=0.367278 grad_norm=nan
+2026-05-02 19:09:50,327 [INFO]   [TFT_D] batch 3500/3631 loss=0.370982 grad_norm=nan
+2026-05-02 19:09:54,779 [INFO]   [TFT_D] batch 3600/3631 loss=0.375997 grad_norm=nan
+2026-05-02 19:10:34,765 [INFO] [TFT_D] Epoch   4/20 | train=0.373169 | val=0.070246 | IC=0.0168 | RankIC=0.0149 | DirAcc=0.509 | lr=2.84e-04 | gn=nan | 200.8s
+2026-05-02 19:10:34,783 [INFO]   ★ New best IC=0.0168 | val_loss=0.070246
+2026-05-02 19:10:39,704 [INFO]   [TFT_D] batch 100/3631 loss=0.368519 grad_norm=nan
+2026-05-02 19:10:44,137 [INFO]   [TFT_D] batch 200/3631 loss=0.364908 grad_norm=nan
+2026-05-02 19:10:48,587 [INFO]   [TFT_D] batch 300/3631 loss=0.377683 grad_norm=nan
+2026-05-02 19:10:53,034 [INFO]   [TFT_D] batch 400/3631 loss=0.380874 grad_norm=nan
+2026-05-02 19:10:57,471 [INFO]   [TFT_D] batch 500/3631 loss=0.360103 grad_norm=nan
+2026-05-02 19:11:01,921 [INFO]   [TFT_D] batch 600/3631 loss=0.372906 grad_norm=nan
+2026-05-02 19:11:06,371 [INFO]   [TFT_D] batch 700/3631 loss=0.374241 grad_norm=nan
+2026-05-02 19:11:10,823 [INFO]   [TFT_D] batch 800/3631 loss=0.372911 grad_norm=nan
+2026-05-02 19:11:15,260 [INFO]   [TFT_D] batch 900/3631 loss=0.363922 grad_norm=nan
+2026-05-02 19:11:19,699 [INFO]   [TFT_D] batch 1000/3631 loss=0.382293 grad_norm=nan
+2026-05-02 19:11:24,099 [INFO]   [TFT_D] batch 1100/3631 loss=0.358825 grad_norm=nan
+2026-05-02 19:11:28,541 [INFO]   [TFT_D] batch 1200/3631 loss=0.375669 grad_norm=nan
+2026-05-02 19:11:32,976 [INFO]   [TFT_D] batch 1300/3631 loss=0.368963 grad_norm=nan
+2026-05-02 19:11:37,418 [INFO]   [TFT_D] batch 1400/3631 loss=0.364642 grad_norm=nan
+2026-05-02 19:11:41,853 [INFO]   [TFT_D] batch 1500/3631 loss=0.371552 grad_norm=nan
+2026-05-02 19:11:46,293 [INFO]   [TFT_D] batch 1600/3631 loss=0.368022 grad_norm=nan
+2026-05-02 19:11:50,735 [INFO]   [TFT_D] batch 1700/3631 loss=0.380552 grad_norm=nan
+2026-05-02 19:11:55,176 [INFO]   [TFT_D] batch 1800/3631 loss=0.388851 grad_norm=nan
+2026-05-02 19:11:59,607 [INFO]   [TFT_D] batch 1900/3631 loss=0.363786 grad_norm=nan
+2026-05-02 19:12:04,067 [INFO]   [TFT_D] batch 2000/3631 loss=0.370803 grad_norm=nan
+2026-05-02 19:12:08,518 [INFO]   [TFT_D] batch 2100/3631 loss=0.374045 grad_norm=nan
+2026-05-02 19:12:12,955 [INFO]   [TFT_D] batch 2200/3631 loss=0.375480 grad_norm=nan
+2026-05-02 19:12:17,373 [INFO]   [TFT_D] batch 2300/3631 loss=0.361583 grad_norm=nan
+2026-05-02 19:12:21,822 [INFO]   [TFT_D] batch 2400/3631 loss=0.376457 grad_norm=nan
+2026-05-02 19:12:26,262 [INFO]   [TFT_D] batch 2500/3631 loss=0.359533 grad_norm=nan
+2026-05-02 19:12:30,710 [INFO]   [TFT_D] batch 2600/3631 loss=0.368656 grad_norm=nan
+2026-05-02 19:12:35,154 [INFO]   [TFT_D] batch 2700/3631 loss=0.369357 grad_norm=nan
+2026-05-02 19:12:39,604 [INFO]   [TFT_D] batch 2800/3631 loss=0.375742 grad_norm=nan
+2026-05-02 19:12:44,054 [INFO]   [TFT_D] batch 2900/3631 loss=0.375878 grad_norm=nan
+2026-05-02 19:12:48,487 [INFO]   [TFT_D] batch 3000/3631 loss=0.387268 grad_norm=nan
+2026-05-02 19:12:52,943 [INFO]   [TFT_D] batch 3100/3631 loss=0.361581 grad_norm=nan
+2026-05-02 19:12:57,361 [INFO]   [TFT_D] batch 3200/3631 loss=0.383881 grad_norm=nan
+2026-05-02 19:13:01,775 [INFO]   [TFT_D] batch 3300/3631 loss=0.368504 grad_norm=nan
+2026-05-02 19:13:06,223 [INFO]   [TFT_D] batch 3400/3631 loss=0.374271 grad_norm=nan
+2026-05-02 19:13:10,660 [INFO]   [TFT_D] batch 3500/3631 loss=0.375750 grad_norm=nan
+2026-05-02 19:13:15,088 [INFO]   [TFT_D] batch 3600/3631 loss=0.375923 grad_norm=nan
+2026-05-02 19:13:55,475 [INFO] [TFT_D] Epoch   5/20 | train=0.371113 | val=0.070292 | IC=0.0164 | RankIC=0.0203 | DirAcc=0.507 | lr=2.71e-04 | gn=nan | 200.7s
+2026-05-02 19:14:00,397 [INFO]   [TFT_D] batch 100/3631 loss=0.378540 grad_norm=nan
+2026-05-02 19:14:04,856 [INFO]   [TFT_D] batch 200/3631 loss=0.359121 grad_norm=nan
+2026-05-02 19:14:09,301 [INFO]   [TFT_D] batch 300/3631 loss=0.359274 grad_norm=nan
+2026-05-02 19:14:13,747 [INFO]   [TFT_D] batch 400/3631 loss=0.361847 grad_norm=nan
+2026-05-02 19:14:18,174 [INFO]   [TFT_D] batch 500/3631 loss=0.362730 grad_norm=nan
+2026-05-02 19:14:22,599 [INFO]   [TFT_D] batch 600/3631 loss=0.361050 grad_norm=nan
+2026-05-02 19:14:27,055 [INFO]   [TFT_D] batch 700/3631 loss=0.382921 grad_norm=nan
+2026-05-02 19:14:31,514 [INFO]   [TFT_D] batch 800/3631 loss=0.349580 grad_norm=nan
+2026-05-02 19:14:35,958 [INFO]   [TFT_D] batch 900/3631 loss=0.358780 grad_norm=nan
+2026-05-02 19:14:40,406 [INFO]   [TFT_D] batch 1000/3631 loss=0.373235 grad_norm=nan
+2026-05-02 19:14:44,852 [INFO]   [TFT_D] batch 1100/3631 loss=0.360422 grad_norm=nan
+2026-05-02 19:14:49,282 [INFO]   [TFT_D] batch 1200/3631 loss=0.360710 grad_norm=nan
+2026-05-02 19:14:53,716 [INFO]   [TFT_D] batch 1300/3631 loss=0.363280 grad_norm=nan
+2026-05-02 19:14:58,162 [INFO]   [TFT_D] batch 1400/3631 loss=0.357531 grad_norm=nan
+2026-05-02 19:15:02,604 [INFO]   [TFT_D] batch 1500/3631 loss=0.369023 grad_norm=nan
+2026-05-02 19:15:07,043 [INFO]   [TFT_D] batch 1600/3631 loss=0.375484 grad_norm=nan
+2026-05-02 19:15:11,481 [INFO]   [TFT_D] batch 1700/3631 loss=0.379987 grad_norm=nan
+2026-05-02 19:15:15,923 [INFO]   [TFT_D] batch 1800/3631 loss=0.353940 grad_norm=nan
+2026-05-02 19:15:20,367 [INFO]   [TFT_D] batch 1900/3631 loss=0.367478 grad_norm=nan
+2026-05-02 19:15:24,810 [INFO]   [TFT_D] batch 2000/3631 loss=0.365927 grad_norm=nan
+2026-05-02 19:15:29,249 [INFO]   [TFT_D] batch 2100/3631 loss=0.364422 grad_norm=nan
+2026-05-02 19:15:33,685 [INFO]   [TFT_D] batch 2200/3631 loss=0.367777 grad_norm=nan
+2026-05-02 19:15:38,112 [INFO]   [TFT_D] batch 2300/3631 loss=0.375121 grad_norm=nan
+2026-05-02 19:15:42,542 [INFO]   [TFT_D] batch 2400/3631 loss=0.378569 grad_norm=nan
+2026-05-02 19:15:46,978 [INFO]   [TFT_D] batch 2500/3631 loss=0.376947 grad_norm=nan
+2026-05-02 19:15:51,426 [INFO]   [TFT_D] batch 2600/3631 loss=0.372049 grad_norm=nan
+2026-05-02 19:15:55,861 [INFO]   [TFT_D] batch 2700/3631 loss=0.368356 grad_norm=nan
+2026-05-02 19:16:00,296 [INFO]   [TFT_D] batch 2800/3631 loss=0.373322 grad_norm=nan
+2026-05-02 19:16:04,728 [INFO]   [TFT_D] batch 2900/3631 loss=0.370000 grad_norm=nan
+2026-05-02 19:16:09,157 [INFO]   [TFT_D] batch 3000/3631 loss=0.361210 grad_norm=nan
+2026-05-02 19:16:13,600 [INFO]   [TFT_D] batch 3100/3631 loss=0.380116 grad_norm=nan
+2026-05-02 19:16:18,050 [INFO]   [TFT_D] batch 3200/3631 loss=0.369415 grad_norm=nan
+2026-05-02 19:16:22,482 [INFO]   [TFT_D] batch 3300/3631 loss=0.371846 grad_norm=nan
+2026-05-02 19:16:26,902 [INFO]   [TFT_D] batch 3400/3631 loss=0.364777 grad_norm=nan
+2026-05-02 19:16:31,349 [INFO]   [TFT_D] batch 3500/3631 loss=0.369913 grad_norm=nan
+2026-05-02 19:16:35,783 [INFO]   [TFT_D] batch 3600/3631 loss=0.367848 grad_norm=nan
+2026-05-02 19:17:15,849 [INFO] [TFT_D] Epoch   6/20 | train=0.368986 | val=0.069788 | IC=0.0239 | RankIC=0.0199 | DirAcc=0.509 | lr=2.56e-04 | gn=nan | 200.4s
+2026-05-02 19:17:15,868 [INFO]   ★ New best IC=0.0239 | val_loss=0.069788
+2026-05-02 19:17:20,794 [INFO]   [TFT_D] batch 100/3631 loss=0.362208 grad_norm=0.0945
+2026-05-02 19:17:25,243 [INFO]   [TFT_D] batch 200/3631 loss=0.372155 grad_norm=nan
+2026-05-02 19:17:29,697 [INFO]   [TFT_D] batch 300/3631 loss=0.372170 grad_norm=nan
+2026-05-02 19:17:34,135 [INFO]   [TFT_D] batch 400/3631 loss=0.366114 grad_norm=nan
+2026-05-02 19:17:38,558 [INFO]   [TFT_D] batch 500/3631 loss=0.359530 grad_norm=nan
+2026-05-02 19:17:43,000 [INFO]   [TFT_D] batch 600/3631 loss=0.367385 grad_norm=nan
+2026-05-02 19:17:47,436 [INFO]   [TFT_D] batch 700/3631 loss=0.383623 grad_norm=nan
+2026-05-02 19:17:51,869 [INFO]   [TFT_D] batch 800/3631 loss=0.372063 grad_norm=nan
+2026-05-02 19:17:56,304 [INFO]   [TFT_D] batch 900/3631 loss=0.378336 grad_norm=nan
+2026-05-02 19:18:00,730 [INFO]   [TFT_D] batch 1000/3631 loss=0.364297 grad_norm=nan
+2026-05-02 19:18:05,162 [INFO]   [TFT_D] batch 1100/3631 loss=0.359291 grad_norm=nan
+2026-05-02 19:18:09,577 [INFO]   [TFT_D] batch 1200/3631 loss=0.365039 grad_norm=nan
+2026-05-02 19:18:13,995 [INFO]   [TFT_D] batch 1300/3631 loss=0.371681 grad_norm=nan
+2026-05-02 19:18:18,407 [INFO]   [TFT_D] batch 1400/3631 loss=0.371327 grad_norm=nan
+2026-05-02 19:18:22,834 [INFO]   [TFT_D] batch 1500/3631 loss=0.377304 grad_norm=nan
+2026-05-02 19:18:27,260 [INFO]   [TFT_D] batch 1600/3631 loss=0.364260 grad_norm=nan
+2026-05-02 19:18:31,692 [INFO]   [TFT_D] batch 1700/3631 loss=0.358539 grad_norm=nan
+2026-05-02 19:18:36,126 [INFO]   [TFT_D] batch 1800/3631 loss=0.359133 grad_norm=nan
+2026-05-02 19:18:40,586 [INFO]   [TFT_D] batch 1900/3631 loss=0.362753 grad_norm=nan
+2026-05-02 19:18:45,045 [INFO]   [TFT_D] batch 2000/3631 loss=0.362692 grad_norm=nan
+2026-05-02 19:18:49,448 [INFO]   [TFT_D] batch 2100/3631 loss=0.354544 grad_norm=nan
+2026-05-02 19:18:53,849 [INFO]   [TFT_D] batch 2200/3631 loss=0.372772 grad_norm=nan
+2026-05-02 19:18:58,259 [INFO]   [TFT_D] batch 2300/3631 loss=0.375254 grad_norm=nan
+2026-05-02 19:19:02,681 [INFO]   [TFT_D] batch 2400/3631 loss=0.360859 grad_norm=nan
+2026-05-02 19:19:07,098 [INFO]   [TFT_D] batch 2500/3631 loss=0.365546 grad_norm=nan
+2026-05-02 19:19:11,511 [INFO]   [TFT_D] batch 2600/3631 loss=0.363137 grad_norm=nan
+2026-05-02 19:19:15,933 [INFO]   [TFT_D] batch 2700/3631 loss=0.377472 grad_norm=nan
+2026-05-02 19:19:20,338 [INFO]   [TFT_D] batch 2800/3631 loss=0.364335 grad_norm=nan
+2026-05-02 19:19:24,716 [INFO]   [TFT_D] batch 2900/3631 loss=0.370990 grad_norm=nan
+2026-05-02 19:19:29,133 [INFO]   [TFT_D] batch 3000/3631 loss=0.349912 grad_norm=nan
+2026-05-02 19:19:33,538 [INFO]   [TFT_D] batch 3100/3631 loss=0.373615 grad_norm=nan
+2026-05-02 19:19:37,938 [INFO]   [TFT_D] batch 3200/3631 loss=0.358697 grad_norm=nan
+2026-05-02 19:19:42,359 [INFO]   [TFT_D] batch 3300/3631 loss=0.358679 grad_norm=nan
+2026-05-02 19:19:46,780 [INFO]   [TFT_D] batch 3400/3631 loss=0.376826 grad_norm=nan
+2026-05-02 19:19:51,194 [INFO]   [TFT_D] batch 3500/3631 loss=0.359391 grad_norm=nan
+2026-05-02 19:19:55,616 [INFO]   [TFT_D] batch 3600/3631 loss=0.368529 grad_norm=nan
+2026-05-02 19:20:35,593 [INFO] [TFT_D] Epoch   7/20 | train=0.366994 | val=0.070493 | IC=0.0167 | RankIC=0.0261 | DirAcc=0.505 | lr=2.38e-04 | gn=nan | 199.7s
+2026-05-02 19:20:40,531 [INFO]   [TFT_D] batch 100/3631 loss=0.362805 grad_norm=0.1092
+2026-05-02 19:20:44,985 [INFO]   [TFT_D] batch 200/3631 loss=0.356795 grad_norm=0.1031
+2026-05-02 19:20:49,419 [INFO]   [TFT_D] batch 300/3631 loss=0.361857 grad_norm=nan
+2026-05-02 19:20:53,868 [INFO]   [TFT_D] batch 400/3631 loss=0.346028 grad_norm=nan
+2026-05-02 19:20:58,309 [INFO]   [TFT_D] batch 500/3631 loss=0.353061 grad_norm=nan
+2026-05-02 19:21:02,766 [INFO]   [TFT_D] batch 600/3631 loss=0.353561 grad_norm=nan
+2026-05-02 19:21:07,229 [INFO]   [TFT_D] batch 700/3631 loss=0.381132 grad_norm=nan
+2026-05-02 19:21:11,675 [INFO]   [TFT_D] batch 800/3631 loss=0.384043 grad_norm=nan
+2026-05-02 19:21:16,128 [INFO]   [TFT_D] batch 900/3631 loss=0.377229 grad_norm=nan
+2026-05-02 19:21:20,575 [INFO]   [TFT_D] batch 1000/3631 loss=0.362954 grad_norm=nan
+2026-05-02 19:21:25,017 [INFO]   [TFT_D] batch 1100/3631 loss=0.362595 grad_norm=nan
+2026-05-02 19:21:29,457 [INFO]   [TFT_D] batch 1200/3631 loss=0.375831 grad_norm=nan
+2026-05-02 19:21:33,887 [INFO]   [TFT_D] batch 1300/3631 loss=0.368480 grad_norm=nan
+2026-05-02 19:21:38,328 [INFO]   [TFT_D] batch 1400/3631 loss=0.370676 grad_norm=nan
+2026-05-02 19:21:42,772 [INFO]   [TFT_D] batch 1500/3631 loss=0.350407 grad_norm=nan
+2026-05-02 19:21:47,222 [INFO]   [TFT_D] batch 1600/3631 loss=0.365817 grad_norm=nan
+2026-05-02 19:21:51,663 [INFO]   [TFT_D] batch 1700/3631 loss=0.373865 grad_norm=nan
+2026-05-02 19:21:56,120 [INFO]   [TFT_D] batch 1800/3631 loss=0.373436 grad_norm=nan
+2026-05-02 19:22:00,572 [INFO]   [TFT_D] batch 1900/3631 loss=0.348203 grad_norm=nan
+2026-05-02 19:22:05,009 [INFO]   [TFT_D] batch 2000/3631 loss=0.368177 grad_norm=nan
+2026-05-02 19:22:09,448 [INFO]   [TFT_D] batch 2100/3631 loss=0.368214 grad_norm=nan
+2026-05-02 19:22:13,901 [INFO]   [TFT_D] batch 2200/3631 loss=0.362481 grad_norm=nan
+2026-05-02 19:22:18,353 [INFO]   [TFT_D] batch 2300/3631 loss=0.385625 grad_norm=nan
+2026-05-02 19:22:22,830 [INFO]   [TFT_D] batch 2400/3631 loss=0.361217 grad_norm=nan
+2026-05-02 19:22:27,266 [INFO]   [TFT_D] batch 2500/3631 loss=0.366316 grad_norm=nan
+2026-05-02 19:22:31,722 [INFO]   [TFT_D] batch 2600/3631 loss=0.349091 grad_norm=nan
+2026-05-02 19:22:36,181 [INFO]   [TFT_D] batch 2700/3631 loss=0.349291 grad_norm=nan
+2026-05-02 19:22:40,631 [INFO]   [TFT_D] batch 2800/3631 loss=0.371148 grad_norm=nan
+2026-05-02 19:22:45,096 [INFO]   [TFT_D] batch 2900/3631 loss=0.364336 grad_norm=nan
+2026-05-02 19:22:49,538 [INFO]   [TFT_D] batch 3000/3631 loss=0.362100 grad_norm=nan
+2026-05-02 19:22:53,990 [INFO]   [TFT_D] batch 3100/3631 loss=0.347047 grad_norm=nan
+2026-05-02 19:22:58,443 [INFO]   [TFT_D] batch 3200/3631 loss=0.363050 grad_norm=nan
+2026-05-02 19:23:02,890 [INFO]   [TFT_D] batch 3300/3631 loss=0.369162 grad_norm=nan
+2026-05-02 19:23:07,335 [INFO]   [TFT_D] batch 3400/3631 loss=0.360542 grad_norm=nan
+2026-05-02 19:23:11,786 [INFO]   [TFT_D] batch 3500/3631 loss=0.356722 grad_norm=nan
+2026-05-02 19:23:19,345 [INFO]   [TFT_D] batch 3600/3631 loss=0.369116 grad_norm=nan
+2026-05-02 19:23:59,616 [INFO] [TFT_D] Epoch   8/20 | train=0.365335 | val=0.069991 | IC=0.0257 | RankIC=0.0298 | DirAcc=0.515 | lr=2.18e-04 | gn=nan | 204.0s
+2026-05-02 19:23:59,635 [INFO]   ★ New best IC=0.0257 | val_loss=0.069991
+2026-05-02 19:24:04,596 [INFO]   [TFT_D] batch 100/3631 loss=0.373310 grad_norm=0.1161
+2026-05-02 19:24:09,057 [INFO]   [TFT_D] batch 200/3631 loss=0.366132 grad_norm=0.1117
+2026-05-02 19:24:13,517 [INFO]   [TFT_D] batch 300/3631 loss=0.355599 grad_norm=nan
+2026-05-02 19:24:17,987 [INFO]   [TFT_D] batch 400/3631 loss=0.369404 grad_norm=nan
+2026-05-02 19:24:22,460 [INFO]   [TFT_D] batch 500/3631 loss=0.352845 grad_norm=nan
+2026-05-02 19:24:26,880 [INFO]   [TFT_D] batch 600/3631 loss=0.383268 grad_norm=nan
+2026-05-02 19:24:31,294 [INFO]   [TFT_D] batch 700/3631 loss=0.358144 grad_norm=nan
+2026-05-02 19:24:35,733 [INFO]   [TFT_D] batch 800/3631 loss=0.365895 grad_norm=nan
+2026-05-02 19:24:40,166 [INFO]   [TFT_D] batch 900/3631 loss=0.380603 grad_norm=nan
+2026-05-02 19:24:44,602 [INFO]   [TFT_D] batch 1000/3631 loss=0.347659 grad_norm=nan
+2026-05-02 19:24:49,040 [INFO]   [TFT_D] batch 1100/3631 loss=0.361315 grad_norm=nan
+2026-05-02 19:24:53,482 [INFO]   [TFT_D] batch 1200/3631 loss=0.368570 grad_norm=nan
+2026-05-02 19:24:57,916 [INFO]   [TFT_D] batch 1300/3631 loss=0.365351 grad_norm=nan
+2026-05-02 19:25:02,364 [INFO]   [TFT_D] batch 1400/3631 loss=0.380967 grad_norm=nan
+2026-05-02 19:25:06,808 [INFO]   [TFT_D] batch 1500/3631 loss=0.363073 grad_norm=nan
+2026-05-02 19:25:11,238 [INFO]   [TFT_D] batch 1600/3631 loss=0.349825 grad_norm=nan
+2026-05-02 19:25:15,664 [INFO]   [TFT_D] batch 1700/3631 loss=0.365001 grad_norm=nan
+2026-05-02 19:25:20,090 [INFO]   [TFT_D] batch 1800/3631 loss=0.361156 grad_norm=nan
+2026-05-02 19:25:24,527 [INFO]   [TFT_D] batch 1900/3631 loss=0.358362 grad_norm=nan
+2026-05-02 19:25:28,977 [INFO]   [TFT_D] batch 2000/3631 loss=0.367882 grad_norm=nan
+2026-05-02 19:25:33,422 [INFO]   [TFT_D] batch 2100/3631 loss=0.361096 grad_norm=nan
+2026-05-02 19:25:37,872 [INFO]   [TFT_D] batch 2200/3631 loss=0.367440 grad_norm=nan
+2026-05-02 19:25:42,310 [INFO]   [TFT_D] batch 2300/3631 loss=0.369142 grad_norm=nan
+2026-05-02 19:25:46,745 [INFO]   [TFT_D] batch 2400/3631 loss=0.375216 grad_norm=nan
+2026-05-02 19:25:51,188 [INFO]   [TFT_D] batch 2500/3631 loss=0.363586 grad_norm=nan
+2026-05-02 19:25:55,619 [INFO]   [TFT_D] batch 2600/3631 loss=0.362894 grad_norm=nan
+2026-05-02 19:26:00,050 [INFO]   [TFT_D] batch 2700/3631 loss=0.378515 grad_norm=nan
+2026-05-02 19:26:04,492 [INFO]   [TFT_D] batch 2800/3631 loss=0.366008 grad_norm=nan
+2026-05-02 19:26:08,921 [INFO]   [TFT_D] batch 2900/3631 loss=0.373232 grad_norm=nan
+2026-05-02 19:26:13,356 [INFO]   [TFT_D] batch 3000/3631 loss=0.362597 grad_norm=nan
+2026-05-02 19:26:17,775 [INFO]   [TFT_D] batch 3100/3631 loss=0.362080 grad_norm=nan
+2026-05-02 19:26:22,189 [INFO]   [TFT_D] batch 3200/3631 loss=0.367209 grad_norm=nan
+2026-05-02 19:26:26,630 [INFO]   [TFT_D] batch 3300/3631 loss=0.367870 grad_norm=nan
+2026-05-02 19:26:31,385 [INFO]   [TFT_D] batch 3400/3631 loss=0.361431 grad_norm=nan
+2026-05-02 19:26:35,807 [INFO]   [TFT_D] batch 3500/3631 loss=0.370146 grad_norm=nan
+2026-05-02 19:26:40,225 [INFO]   [TFT_D] batch 3600/3631 loss=0.363623 grad_norm=nan
+2026-05-02 19:27:20,249 [INFO] [TFT_D] Epoch   9/20 | train=0.363585 | val=0.070076 | IC=0.0138 | RankIC=0.0246 | DirAcc=0.507 | lr=1.97e-04 | gn=nan | 200.6s
+2026-05-02 19:27:25,189 [INFO]   [TFT_D] batch 100/3631 loss=0.353565 grad_norm=0.1170
+2026-05-02 19:27:29,651 [INFO]   [TFT_D] batch 200/3631 loss=0.367777 grad_norm=0.1186
+2026-05-02 19:27:34,127 [INFO]   [TFT_D] batch 300/3631 loss=0.368277 grad_norm=inf
+2026-05-02 19:27:38,591 [INFO]   [TFT_D] batch 400/3631 loss=0.356384 grad_norm=nan
+2026-05-02 19:27:43,028 [INFO]   [TFT_D] batch 500/3631 loss=0.366111 grad_norm=nan
+2026-05-02 19:27:47,458 [INFO]   [TFT_D] batch 600/3631 loss=0.356115 grad_norm=nan
+2026-05-02 19:27:51,909 [INFO]   [TFT_D] batch 700/3631 loss=0.353632 grad_norm=nan
+2026-05-02 19:27:56,344 [INFO]   [TFT_D] batch 800/3631 loss=0.383115 grad_norm=nan
+2026-05-02 19:28:00,779 [INFO]   [TFT_D] batch 900/3631 loss=0.362719 grad_norm=nan
+2026-05-02 19:28:05,228 [INFO]   [TFT_D] batch 1000/3631 loss=0.351856 grad_norm=nan
+2026-05-02 19:28:09,674 [INFO]   [TFT_D] batch 1100/3631 loss=0.356843 grad_norm=nan
+2026-05-02 19:28:14,114 [INFO]   [TFT_D] batch 1200/3631 loss=0.363070 grad_norm=nan
+2026-05-02 19:28:18,544 [INFO]   [TFT_D] batch 1300/3631 loss=0.352710 grad_norm=nan
+2026-05-02 19:28:22,974 [INFO]   [TFT_D] batch 1400/3631 loss=0.370828 grad_norm=nan
+2026-05-02 19:28:27,416 [INFO]   [TFT_D] batch 1500/3631 loss=0.375918 grad_norm=nan
+2026-05-02 19:28:31,863 [INFO]   [TFT_D] batch 1600/3631 loss=0.347402 grad_norm=nan
+2026-05-02 19:28:36,306 [INFO]   [TFT_D] batch 1700/3631 loss=0.357790 grad_norm=nan
+2026-05-02 19:28:40,759 [INFO]   [TFT_D] batch 1800/3631 loss=0.372019 grad_norm=nan
+2026-05-02 19:28:45,204 [INFO]   [TFT_D] batch 1900/3631 loss=0.383473 grad_norm=nan
+2026-05-02 19:28:49,652 [INFO]   [TFT_D] batch 2000/3631 loss=0.361422 grad_norm=nan
+2026-05-02 19:28:54,104 [INFO]   [TFT_D] batch 2100/3631 loss=0.368303 grad_norm=nan
+2026-05-02 19:28:58,535 [INFO]   [TFT_D] batch 2200/3631 loss=0.364296 grad_norm=nan
+2026-05-02 19:29:02,957 [INFO]   [TFT_D] batch 2300/3631 loss=0.372518 grad_norm=nan
+2026-05-02 19:29:07,375 [INFO]   [TFT_D] batch 2400/3631 loss=0.376785 grad_norm=nan
+2026-05-02 19:29:11,814 [INFO]   [TFT_D] batch 2500/3631 loss=0.355138 grad_norm=nan
+2026-05-02 19:29:16,267 [INFO]   [TFT_D] batch 2600/3631 loss=0.363627 grad_norm=nan
+2026-05-02 19:29:20,704 [INFO]   [TFT_D] batch 2700/3631 loss=0.354161 grad_norm=nan
+2026-05-02 19:29:25,139 [INFO]   [TFT_D] batch 2800/3631 loss=0.351310 grad_norm=nan
+2026-05-02 19:29:29,589 [INFO]   [TFT_D] batch 2900/3631 loss=0.370385 grad_norm=nan
+2026-05-02 19:29:34,031 [INFO]   [TFT_D] batch 3000/3631 loss=0.363707 grad_norm=nan
+2026-05-02 19:29:38,464 [INFO]   [TFT_D] batch 3100/3631 loss=0.376780 grad_norm=nan
+2026-05-02 19:29:43,237 [INFO]   [TFT_D] batch 3200/3631 loss=0.364416 grad_norm=nan
+2026-05-02 19:29:47,673 [INFO]   [TFT_D] batch 3300/3631 loss=0.370482 grad_norm=nan
+2026-05-02 19:29:52,120 [INFO]   [TFT_D] batch 3400/3631 loss=0.369539 grad_norm=nan
+2026-05-02 19:29:56,546 [INFO]   [TFT_D] batch 3500/3631 loss=0.350313 grad_norm=nan
+2026-05-02 19:30:00,981 [INFO]   [TFT_D] batch 3600/3631 loss=0.357525 grad_norm=nan
+2026-05-02 19:30:41,044 [INFO] [TFT_D] Epoch  10/20 | train=0.362088 | val=0.070635 | IC=0.0227 | RankIC=0.0262 | DirAcc=0.513 | lr=1.74e-04 | gn=nan | 200.8s
+2026-05-02 19:30:46,010 [INFO]   [TFT_D] batch 100/3631 loss=0.371867 grad_norm=0.1177
+2026-05-02 19:30:50,501 [INFO]   [TFT_D] batch 200/3631 loss=0.359349 grad_norm=0.1217
+2026-05-02 19:30:54,970 [INFO]   [TFT_D] batch 300/3631 loss=0.355484 grad_norm=nan
+2026-05-02 19:30:59,419 [INFO]   [TFT_D] batch 400/3631 loss=0.365578 grad_norm=nan
+2026-05-02 19:31:03,869 [INFO]   [TFT_D] batch 500/3631 loss=0.356522 grad_norm=nan
+2026-05-02 19:31:08,304 [INFO]   [TFT_D] batch 600/3631 loss=0.337541 grad_norm=nan
+2026-05-02 19:31:12,745 [INFO]   [TFT_D] batch 700/3631 loss=0.340788 grad_norm=nan
+2026-05-02 19:31:17,163 [INFO]   [TFT_D] batch 800/3631 loss=0.372698 grad_norm=nan
+2026-05-02 19:31:21,577 [INFO]   [TFT_D] batch 900/3631 loss=0.355490 grad_norm=nan
+2026-05-02 19:31:26,027 [INFO]   [TFT_D] batch 1000/3631 loss=0.353312 grad_norm=nan
+2026-05-02 19:31:30,484 [INFO]   [TFT_D] batch 1100/3631 loss=0.374041 grad_norm=nan
+2026-05-02 19:31:34,924 [INFO]   [TFT_D] batch 1200/3631 loss=0.365081 grad_norm=nan
+2026-05-02 19:31:39,377 [INFO]   [TFT_D] batch 1300/3631 loss=0.354991 grad_norm=nan
+2026-05-02 19:31:43,825 [INFO]   [TFT_D] batch 1400/3631 loss=0.351488 grad_norm=nan
+2026-05-02 19:31:48,272 [INFO]   [TFT_D] batch 1500/3631 loss=0.364229 grad_norm=nan
+2026-05-02 19:31:52,735 [INFO]   [TFT_D] batch 1600/3631 loss=0.370741 grad_norm=nan
+2026-05-02 19:31:57,179 [INFO]   [TFT_D] batch 1700/3631 loss=0.357261 grad_norm=nan
+2026-05-02 19:32:01,609 [INFO]   [TFT_D] batch 1800/3631 loss=0.366709 grad_norm=nan
+2026-05-02 19:32:06,060 [INFO]   [TFT_D] batch 1900/3631 loss=0.356693 grad_norm=nan
+2026-05-02 19:32:10,520 [INFO]   [TFT_D] batch 2000/3631 loss=0.350502 grad_norm=nan
+2026-05-02 19:32:14,950 [INFO]   [TFT_D] batch 2100/3631 loss=0.377039 grad_norm=nan
+2026-05-02 19:32:19,392 [INFO]   [TFT_D] batch 2200/3631 loss=0.367765 grad_norm=nan
+2026-05-02 19:32:23,843 [INFO]   [TFT_D] batch 2300/3631 loss=0.371592 grad_norm=nan
+2026-05-02 19:32:28,287 [INFO]   [TFT_D] batch 2400/3631 loss=0.369494 grad_norm=nan
+2026-05-02 19:32:32,738 [INFO]   [TFT_D] batch 2500/3631 loss=0.361503 grad_norm=nan
+2026-05-02 19:32:37,194 [INFO]   [TFT_D] batch 2600/3631 loss=0.358059 grad_norm=nan
+2026-05-02 19:32:41,634 [INFO]   [TFT_D] batch 2700/3631 loss=0.351493 grad_norm=nan
+2026-05-02 19:32:46,074 [INFO]   [TFT_D] batch 2800/3631 loss=0.364377 grad_norm=nan
+2026-05-02 19:32:50,509 [INFO]   [TFT_D] batch 2900/3631 loss=0.356982 grad_norm=nan
+2026-05-02 19:32:55,285 [INFO]   [TFT_D] batch 3000/3631 loss=0.357081 grad_norm=nan
+2026-05-02 19:32:59,735 [INFO]   [TFT_D] batch 3100/3631 loss=0.360534 grad_norm=nan
+2026-05-02 19:33:04,195 [INFO]   [TFT_D] batch 3200/3631 loss=0.365963 grad_norm=nan
+2026-05-02 19:33:08,640 [INFO]   [TFT_D] batch 3300/3631 loss=0.362556 grad_norm=nan
+2026-05-02 19:33:13,077 [INFO]   [TFT_D] batch 3400/3631 loss=0.354443 grad_norm=nan
+2026-05-02 19:33:17,546 [INFO]   [TFT_D] batch 3500/3631 loss=0.353337 grad_norm=nan
+2026-05-02 19:33:22,000 [INFO]   [TFT_D] batch 3600/3631 loss=0.366068 grad_norm=nan
+2026-05-02 19:34:02,002 [INFO] [TFT_D] Epoch  11/20 | train=0.360630 | val=0.070518 | IC=0.0208 | RankIC=0.0288 | DirAcc=0.513 | lr=1.50e-04 | gn=nan | 201.0s
+2026-05-02 19:34:06,961 [INFO]   [TFT_D] batch 100/3631 loss=0.358548 grad_norm=0.1208
+2026-05-02 19:34:11,454 [INFO]   [TFT_D] batch 200/3631 loss=0.358733 grad_norm=nan
+2026-05-02 19:34:15,930 [INFO]   [TFT_D] batch 300/3631 loss=0.361290 grad_norm=nan
+2026-05-02 19:34:20,405 [INFO]   [TFT_D] batch 400/3631 loss=0.374359 grad_norm=nan
+2026-05-02 19:34:24,871 [INFO]   [TFT_D] batch 500/3631 loss=0.358927 grad_norm=nan
+2026-05-02 19:34:29,354 [INFO]   [TFT_D] batch 600/3631 loss=0.369193 grad_norm=nan
+2026-05-02 19:34:33,812 [INFO]   [TFT_D] batch 700/3631 loss=0.363004 grad_norm=nan
+2026-05-02 19:34:38,286 [INFO]   [TFT_D] batch 800/3631 loss=0.355879 grad_norm=nan
+2026-05-02 19:34:42,747 [INFO]   [TFT_D] batch 900/3631 loss=0.359011 grad_norm=nan
+2026-05-02 19:34:47,200 [INFO]   [TFT_D] batch 1000/3631 loss=0.349678 grad_norm=nan
+2026-05-02 19:34:51,655 [INFO]   [TFT_D] batch 1100/3631 loss=0.352998 grad_norm=nan
+2026-05-02 19:34:56,125 [INFO]   [TFT_D] batch 1200/3631 loss=0.357823 grad_norm=nan
+2026-05-02 19:35:00,561 [INFO]   [TFT_D] batch 1300/3631 loss=0.363020 grad_norm=nan
+2026-05-02 19:35:05,026 [INFO]   [TFT_D] batch 1400/3631 loss=0.365524 grad_norm=nan
+2026-05-02 19:35:09,477 [INFO]   [TFT_D] batch 1500/3631 loss=0.366159 grad_norm=nan
+2026-05-02 19:35:13,926 [INFO]   [TFT_D] batch 1600/3631 loss=0.353638 grad_norm=nan
+2026-05-02 19:35:18,370 [INFO]   [TFT_D] batch 1700/3631 loss=0.360901 grad_norm=nan
+2026-05-02 19:35:22,839 [INFO]   [TFT_D] batch 1800/3631 loss=0.364450 grad_norm=nan
+2026-05-02 19:35:27,306 [INFO]   [TFT_D] batch 1900/3631 loss=0.348388 grad_norm=nan
+2026-05-02 19:35:31,779 [INFO]   [TFT_D] batch 2000/3631 loss=0.345766 grad_norm=nan
+2026-05-02 19:35:36,237 [INFO]   [TFT_D] batch 2100/3631 loss=0.355780 grad_norm=nan
+2026-05-02 19:35:40,691 [INFO]   [TFT_D] batch 2200/3631 loss=0.329622 grad_norm=nan
+2026-05-02 19:35:45,151 [INFO]   [TFT_D] batch 2300/3631 loss=0.366785 grad_norm=nan
+2026-05-02 19:35:49,598 [INFO]   [TFT_D] batch 2400/3631 loss=0.367669 grad_norm=nan
+2026-05-02 19:35:54,057 [INFO]   [TFT_D] batch 2500/3631 loss=0.363247 grad_norm=nan
+2026-05-02 19:35:58,536 [INFO]   [TFT_D] batch 2600/3631 loss=0.345081 grad_norm=nan
+2026-05-02 19:36:03,000 [INFO]   [TFT_D] batch 2700/3631 loss=0.353227 grad_norm=nan
+2026-05-02 19:36:07,463 [INFO]   [TFT_D] batch 2800/3631 loss=0.346549 grad_norm=nan
+2026-05-02 19:36:12,256 [INFO]   [TFT_D] batch 2900/3631 loss=0.356584 grad_norm=nan
+2026-05-02 19:36:16,724 [INFO]   [TFT_D] batch 3000/3631 loss=0.352016 grad_norm=nan
+2026-05-02 19:36:21,194 [INFO]   [TFT_D] batch 3100/3631 loss=0.349271 grad_norm=nan
+2026-05-02 19:36:25,654 [INFO]   [TFT_D] batch 3200/3631 loss=0.367435 grad_norm=nan
+2026-05-02 19:36:30,125 [INFO]   [TFT_D] batch 3300/3631 loss=0.373199 grad_norm=nan
+2026-05-02 19:36:34,613 [INFO]   [TFT_D] batch 3400/3631 loss=0.360862 grad_norm=nan
+2026-05-02 19:36:39,094 [INFO]   [TFT_D] batch 3500/3631 loss=0.349788 grad_norm=nan
+2026-05-02 19:36:43,571 [INFO]   [TFT_D] batch 3600/3631 loss=0.367003 grad_norm=nan
+2026-05-02 19:37:23,697 [INFO] [TFT_D] Epoch  12/20 | train=0.359251 | val=0.070181 | IC=0.0156 | RankIC=0.0257 | DirAcc=0.512 | lr=1.27e-04 | gn=nan | 201.7s
+2026-05-02 19:37:28,644 [INFO]   [TFT_D] batch 100/3631 loss=0.360378 grad_norm=nan
+2026-05-02 19:37:33,090 [INFO]   [TFT_D] batch 200/3631 loss=0.362422 grad_norm=nan
+2026-05-02 19:37:37,546 [INFO]   [TFT_D] batch 300/3631 loss=0.355774 grad_norm=nan
+2026-05-02 19:37:41,996 [INFO]   [TFT_D] batch 400/3631 loss=0.362298 grad_norm=nan
+2026-05-02 19:37:46,452 [INFO]   [TFT_D] batch 500/3631 loss=0.348606 grad_norm=nan
+2026-05-02 19:37:50,899 [INFO]   [TFT_D] batch 600/3631 loss=0.371206 grad_norm=nan
+2026-05-02 19:37:55,356 [INFO]   [TFT_D] batch 700/3631 loss=0.358024 grad_norm=nan
+2026-05-02 19:37:59,785 [INFO]   [TFT_D] batch 800/3631 loss=0.353359 grad_norm=nan
+2026-05-02 19:38:04,238 [INFO]   [TFT_D] batch 900/3631 loss=0.360396 grad_norm=nan
+2026-05-02 19:38:08,686 [INFO]   [TFT_D] batch 1000/3631 loss=0.349034 grad_norm=nan
+2026-05-02 19:38:13,142 [INFO]   [TFT_D] batch 1100/3631 loss=0.363580 grad_norm=nan
+2026-05-02 19:38:17,571 [INFO]   [TFT_D] batch 1200/3631 loss=0.367943 grad_norm=nan
+2026-05-02 19:38:22,013 [INFO]   [TFT_D] batch 1300/3631 loss=0.348208 grad_norm=nan
+2026-05-02 19:38:26,470 [INFO]   [TFT_D] batch 1400/3631 loss=0.356012 grad_norm=nan
+2026-05-02 19:38:30,912 [INFO]   [TFT_D] batch 1500/3631 loss=0.367985 grad_norm=nan
+2026-05-02 19:38:35,351 [INFO]   [TFT_D] batch 1600/3631 loss=0.351836 grad_norm=nan
+2026-05-02 19:38:39,799 [INFO]   [TFT_D] batch 1700/3631 loss=0.330941 grad_norm=nan
+2026-05-02 19:38:44,247 [INFO]   [TFT_D] batch 1800/3631 loss=0.365950 grad_norm=nan
+2026-05-02 19:38:48,693 [INFO]   [TFT_D] batch 1900/3631 loss=0.336386 grad_norm=nan
+2026-05-02 19:38:53,142 [INFO]   [TFT_D] batch 2000/3631 loss=0.350899 grad_norm=nan
+2026-05-02 19:38:57,592 [INFO]   [TFT_D] batch 2100/3631 loss=0.351223 grad_norm=nan
+2026-05-02 19:39:02,034 [INFO]   [TFT_D] batch 2200/3631 loss=0.357895 grad_norm=nan
+2026-05-02 19:39:06,517 [INFO]   [TFT_D] batch 2300/3631 loss=0.368860 grad_norm=nan
+2026-05-02 19:39:10,969 [INFO]   [TFT_D] batch 2400/3631 loss=0.362010 grad_norm=nan
+2026-05-02 19:39:15,395 [INFO]   [TFT_D] batch 2500/3631 loss=0.350642 grad_norm=nan
+2026-05-02 19:39:19,852 [INFO]   [TFT_D] batch 2600/3631 loss=0.359403 grad_norm=nan
+2026-05-02 19:39:24,640 [INFO]   [TFT_D] batch 2700/3631 loss=0.375150 grad_norm=nan
+2026-05-02 19:39:29,145 [INFO]   [TFT_D] batch 2800/3631 loss=0.346054 grad_norm=nan
+2026-05-02 19:39:33,617 [INFO]   [TFT_D] batch 2900/3631 loss=0.365002 grad_norm=nan
+2026-05-02 19:39:38,095 [INFO]   [TFT_D] batch 3000/3631 loss=0.341635 grad_norm=nan
+2026-05-02 19:39:42,589 [INFO]   [TFT_D] batch 3100/3631 loss=0.332076 grad_norm=nan
+2026-05-02 19:39:47,067 [INFO]   [TFT_D] batch 3200/3631 loss=0.360990 grad_norm=nan
+2026-05-02 19:39:51,546 [INFO]   [TFT_D] batch 3300/3631 loss=0.340362 grad_norm=nan
+2026-05-02 19:39:56,012 [INFO]   [TFT_D] batch 3400/3631 loss=0.359254 grad_norm=nan
+2026-05-02 19:40:00,515 [INFO]   [TFT_D] batch 3500/3631 loss=0.351524 grad_norm=nan
+2026-05-02 19:40:05,003 [INFO]   [TFT_D] batch 3600/3631 loss=0.339166 grad_norm=nan
+2026-05-02 19:40:45,098 [INFO] [TFT_D] Epoch  13/20 | train=0.357997 | val=0.070375 | IC=0.0207 | RankIC=0.0268 | DirAcc=0.514 | lr=1.04e-04 | gn=nan | 201.4s
+2026-05-02 19:40:45,098 [INFO]   Early stopping at epoch 13 (best IC=0.0257)
+2026-05-02 19:40:45,119 [INFO]   Training curve → results/wf_daily_only/window_4/TFT_D_history.csv
+2026-05-02 19:40:45,122 [INFO] 
+  Phase 3: Training meta model...
+2026-05-02 19:40:45,124 [WARNING]   No minute weights found — minute sub-models will be random init
+2026-05-02 19:40:45,125 [INFO] Collecting sub-model outputs for meta training...
+2026-05-02 19:40:45,125 [INFO] Sub-models frozen for meta training (2 models)
+2026-05-02 19:44:15,734 [INFO]   Meta align: 464871 union keys | matched: lstm_d=464768, tft_d=464768
+2026-05-02 19:45:55,700 [INFO]   Meta align: 234970 union keys | matched: lstm_d=234970, tft_d=234970
+2026-05-02 19:45:56,894 [INFO]   Meta train: 464,871 | val: 234,970
+2026-05-02 19:45:56,899 [INFO] 
+============================================================
+2026-05-02 19:45:56,899 [INFO] Training MetaMLP for 10 epochs (18,659 params)
+2026-05-02 19:45:56,899 [INFO]   Early-stop metric: IC, patience=5
+2026-05-02 19:45:56,899 [INFO] ============================================================
+2026-05-02 19:46:06,993 [INFO] [Meta] Epoch   1/10 | train=0.006610 | val=0.007391 | IC=0.0459 | RankIC=0.0340 | DirAcc=0.515 | 10.1s
+2026-05-02 19:46:06,994 [INFO]   ★ New best meta IC=0.0459 | val=0.007391
+2026-05-02 19:46:16,961 [INFO] [Meta] Epoch   2/10 | train=0.006583 | val=0.007400 | IC=0.0426 | RankIC=0.0305 | DirAcc=0.513 | 10.0s
+2026-05-02 19:46:27,112 [INFO] [Meta] Epoch   3/10 | train=0.006577 | val=0.007402 | IC=0.0392 | RankIC=0.0320 | DirAcc=0.514 | 10.2s
+2026-05-02 19:46:37,221 [INFO] [Meta] Epoch   4/10 | train=0.006573 | val=0.007409 | IC=0.0402 | RankIC=0.0275 | DirAcc=0.511 | 10.1s
+2026-05-02 19:46:47,129 [INFO] [Meta] Epoch   5/10 | train=0.006566 | val=0.007394 | IC=0.0439 | RankIC=0.0340 | DirAcc=0.512 | 9.9s
+2026-05-02 19:46:57,012 [INFO] [Meta] Epoch   6/10 | train=0.006560 | val=0.007435 | IC=0.0405 | RankIC=0.0260 | DirAcc=0.509 | 9.9s
+2026-05-02 19:46:57,012 [INFO]   Early stopping at epoch 6 (best IC=0.0459)
+2026-05-02 19:46:57,014 [INFO]   Training curve → results/wf_daily_only/window_4/Meta_history.csv
+2026-05-02 19:46:57,027 [INFO] 
+  Evaluating on validation set for IC weighting...
+2026-05-02 19:48:16,419 [INFO] 
+  Evaluating on test window...

@@ -120,7 +120,7 @@ class NewsEncoder(nn.Module):
                 nn.init.zeros_(p)
         self.lstm.flatten_parameters()
 
-    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def forward(self, x: torch.Tensor, news_coverage: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
         """
         Args:
             x: (batch, seq_len, input_dim)
@@ -152,8 +152,21 @@ class NewsEncoder(nn.Module):
         # Outputs
         embedding = self.embedding_head(last_hidden)
 
+        # Optionally gate the embedding by a coverage/confidence scalar so the
+        # meta-MLP can learn to down-weight zero-filled sequences.
+        if news_coverage is not None:
+            # news_coverage expected shape: (B,) or (B,1) with values in [0,1]
+            cov = news_coverage.squeeze(-1) if news_coverage.dim() > 1 else news_coverage
+            coverage_gate = cov.unsqueeze(-1).to(embedding.device)
+            embedding = embedding * coverage_gate
+
         h = self.regression_drop(self.regression_act(self.regression_proj(last_hidden)))
         prediction = (self.regression_out(h) + self.regression_skip(last_hidden)).squeeze(-1)
+
+        # Scale prediction toward zero when coverage is low so zero-filled
+        # sequences contribute minimally to the loss.
+        if news_coverage is not None:
+            prediction = prediction * cov.to(prediction.device)
 
         return {"prediction": prediction, "embedding": embedding}
 

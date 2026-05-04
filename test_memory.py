@@ -1,77 +1,48 @@
-#!/usr/bin/env python3
-"""Quick memory profiling for the hierarchical system."""
+"""Debug script: construct HierarchicalForecaster and print TFT minute param breakdown.
 
-import torch
+This file is intended to be runnable from the repo root.
+"""
 import sys
-from pathlib import Path
+import pprint
 
-sys.path.insert(0, str(Path(__file__).parent))
-
+sys.path.append('.')
 from src.hierarchical_models import HierarchicalForecaster, HierarchicalModelConfig
 
-def test_memory():
-    """Test memory usage of models."""
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    def print_mem():
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-            allocated = torch.cuda.memory_allocated() / 1e9
-            reserved = torch.cuda.memory_reserved() / 1e9
-            total = torch.cuda.get_device_properties(0).total_memory / 1e9
-            free = total - allocated
-            print(f"  Allocated: {allocated:.2f}GB / Reserved: {reserved:.2f}GB / Free: {free:.2f}GB / Total: {total:.2f}GB")
-    
-    print("Memory Test\n" + "="*60)
-    
-    # Test model creation
-    print("\n1. Creating model...")
-    cfg = HierarchicalModelConfig(
-        daily_input_dim=56,
-        minute_input_dim=23,
-    )
-    model = HierarchicalForecaster(cfg).to(device)
-    print_mem()
-    
-    # Test forward pass - daily batch
-    print("\n2. Forward pass - daily batch (batch=64, seq=720, feat=56)...")
-    torch.cuda.reset_peak_memory_stats()
-    x_daily = torch.randn(64, 720, 56, device=device)
-    x_minute = torch.randn(64, 780, 23, device=device)
-    regime = torch.randn(64, 8, device=device)
-    
-    with torch.no_grad():
-        out = model(x_daily, x_minute, regime)
-    print_mem()
-    
-    # Test training batch (larger)
-    print("\n3. Forward pass - larger batch (batch=128)...")
-    torch.cuda.reset_peak_memory_stats()
-    x_daily = torch.randn(128, 720, 56, device=device)
-    x_minute = torch.randn(128, 780, 23, device=device)
-    regime = torch.randn(128, 8, device=device)
-    
-    with torch.no_grad():
-        out = model(x_daily, x_minute, regime)
-    print_mem()
-    
-    # Test with gradient (backward)
-    print("\n4. Forward + backward - batch (batch=32)...")
-    torch.cuda.reset_peak_memory_stats()
-    x_daily = torch.randn(32, 720, 56, device=device, requires_grad=True)
-    x_minute = torch.randn(32, 780, 23, device=device, requires_grad=True)
-    regime = torch.randn(32, 8, device=device)
-    
-    out = model(x_daily, x_minute, regime)
-    loss = out["prediction"].sum()
-    loss.backward()
-    print_mem()
-    
-    print("\n" + "="*60)
-    print("Recommendations:")
-    print("  - Use --low-memory flag to reduce batch sizes")
-    print("  - Or use: --batch-size 32 (for phase 1-2)")
-    print("  - Phase 3 (meta) can use larger batches (up to 512)")
+cfg = HierarchicalModelConfig(
+    use_news_model=True,
+    use_tcn_d=True,
+    use_fund_mlp=True,
+    use_gnn_features=True,
+)
+# V10 overrides used in the run (minute models small in v10)
+cfg.minute_hidden_dim = 64
+cfg.minute_n_layers = 1
+cfg.minute_dropout = 0.3
 
-if __name__ == "__main__":
-    test_memory()
+forecaster = HierarchicalForecaster(cfg)
+
+print('Model config:')
+pprint.pprint(vars(cfg))
+
+print('\nPer-submodel params and input dims:')
+for name in forecaster.sub_model_names:
+    m = forecaster.sub_models[name]
+    inp = getattr(m, 'input_dim', None)
+    if inp is None and hasattr(m, 'config'):
+        inp = getattr(m.config, 'input_dim', None)
+    print(f"{name:8s}: params={m.count_parameters():,}, input_dim={inp}")
+
+print('\nDetailed tft_m breakdown:')
+total = 0
+by_module = {}
+for name, p in forecaster.tft_m.named_parameters():
+    n = p.numel()
+    total += n
+    top = name.split('.')[0]
+    by_module[top] = by_module.get(top, 0) + n
+
+print("tft_m total params:", total)
+for mod, cnt in sorted(by_module.items(), key=lambda x: -x[1])[:40]:
+    print(f"{mod:30s} {cnt:,}")
+
+print('\nGrand total (sub-models + meta):', sum(m.count_parameters() for m in forecaster.sub_models.values()) + forecaster.meta.count_parameters())

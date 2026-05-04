@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-05-03T22:24:35.292245",
+  "window_idx": 3,
+  "bias": {
+    "lstm_d": 0.421024,
+    "tft_d": 0.333988,
+    "lstm_m": -0.251671,
+    "tft_m": -0.251671,
+    "news": -0.251671
+  },
+  "bias_strength": 0.5,
+  "momentum": 0.7,
+  "metrics": {
+    "sub_model_ic": {
+      "lstm_d": 0.0178,
+      "tft_d": 0.0234,
+      "lstm_m": 0.0,
+      "tft_m": 0.0,
+      "news": 0.0
+    }
+  }
+}

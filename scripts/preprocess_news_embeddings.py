@@ -226,6 +226,18 @@ def preprocess_ticker_news(
             still_empty = ndf["_text"].str.strip() == ""
             ndf.loc[still_empty, "_text"] = ndf.loc[still_empty, "Article_title"].astype(str)
 
+    # Instrumentation: warn if a large fraction of articles fell back to very short title-only text
+    try:
+        fallback_to_title = (ndf["_text"].str.strip().str.len() < 30).sum()
+        if fallback_to_title > len(ndf) * 0.3:
+            logger.warning(
+                f"  {ticker}: {fallback_to_title}/{len(ndf)} articles "
+                f"falling back to short/title-only text — check summary columns"
+            )
+    except Exception:
+        # Best-effort instrumentation; don't fail the pipeline for odd data types
+        pass
+
     # Article length (raw body, used as impact signal in alignment)
     if "Article" in ndf.columns:
         ndf["_art_len"] = ndf["Article"].fillna("").astype(str).str.len().astype(np.float32)

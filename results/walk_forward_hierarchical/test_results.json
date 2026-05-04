@@ -1,0 +1,34 @@
+{
+  "LSTM_D": {
+    "mse": 0.0006,
+    "rmse": 0.0245,
+    "mae": 0.0163,
+    "ic": -0.054386,
+    "rank_ic": -0.054078,
+    "directional_accuracy": 0.52
+  },
+  "TFT_D": {
+    "mse": 0.0006,
+    "rmse": 0.0245,
+    "mae": 0.0163,
+    "ic": 0.049393,
+    "rank_ic": 0.045571,
+    "directional_accuracy": 0.52
+  },
+  "META": {
+    "mse": 0.0006,
+    "rmse": 0.0245,
+    "mae": 0.0163,
+    "ic": 0.066615,
+    "rank_ic": 0.066143,
+    "directional_accuracy": 0.52
+  },
+  "JOINT": {
+    "mse": 0.0006,
+    "rmse": 0.0245,
+    "mae": 0.0163,
+    "ic": 0.045981,
+    "rank_ic": 0.045981,
+    "directional_accuracy": 0.52
+  }
+}

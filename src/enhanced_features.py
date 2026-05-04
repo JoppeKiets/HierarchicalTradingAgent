@@ -44,6 +44,8 @@ class FeatureConfig:
 
     # Target type: "close_to_close" (default) or "open_to_close" (same-day intraday return)
     target_type: str = "close_to_close"
+    # Use log-returns for targets instead of simple returns (False = simple)
+    use_log_returns: bool = False
     
     # Target scheme
     n_classes: int = 3            # 3 = down/flat/up, 5 = strong_down/.../strong_up, 0 = regression
@@ -53,7 +55,7 @@ class FeatureConfig:
     
     # Normalization
     normalize: bool = True
-    norm_window: int = 60         # Rolling z-score window
+    norm_window: int = 252        # Rolling z-score window (default: 1 trading year)
     clip_value: float = 5.0       # Clip normalized features at ±5σ
     
     # Feature toggles (all on by default)
@@ -88,7 +90,13 @@ def _ema(data: np.ndarray, span: int) -> np.ndarray:
 
 def _sma(data: np.ndarray, window: int) -> np.ndarray:
     """Simple moving average with NaN handling."""
-    return pd.Series(data).rolling(window, min_periods=1).mean().values
+    s = pd.Series(data)
+    min_periods = max(1, window // 2)
+    rolled = s.rolling(window, min_periods=min_periods).mean()
+    # Fill initial NaNs (insufficient window) with expanding mean to avoid
+    # using very small-sample rolling means which are noisy.
+    filled = rolled.fillna(s.expanding().mean())
+    return filled.values
 
 
 def _rolling_std(data: np.ndarray, window: int) -> np.ndarray:
@@ -498,20 +506,28 @@ def normalize_features(features_df: pd.DataFrame, window: int = 60, clip: float 
     """
     normalized = pd.DataFrame(index=features_df.index)
     
+    min_periods = max(2, window // 2)
     for col in features_df.columns:
         series = features_df[col]
-        roll_mean = series.rolling(window, min_periods=10).mean()
-        roll_std = series.rolling(window, min_periods=10).std()
-        
+        roll_mean = series.rolling(window, min_periods=min_periods).mean()
+        roll_std = series.rolling(window, min_periods=min_periods).std()
+
+        # For the earliest rows where rolling produced NaN (insufficient data),
+        # fall back to the global mean/std to avoid overly noisy estimates.
+        global_mean = series.mean()
+        global_std = series.std() if series.std() > 1e-8 else 1.0
+        roll_mean = roll_mean.fillna(global_mean)
+        roll_std = roll_std.fillna(global_std)
+
         # Z-score normalization
         z_scored = (series - roll_mean) / (roll_std + 1e-10)
-        
+
         # Clip extreme values
         z_scored = z_scored.clip(-clip, clip)
-        
-        # Fill initial NaN with 0
+
+        # Fill any remaining NaN with 0
         z_scored = z_scored.fillna(0)
-        
+
         normalized[col] = z_scored
     
     return normalized
@@ -541,7 +557,11 @@ def compute_targets(
     else:
         future_returns = np.zeros(n, dtype=np.float32)
         for i in range(n - cfg.forecast_horizon):
-            future_returns[i] = (close[i + cfg.forecast_horizon] - close[i]) / close[i]
+            if getattr(cfg, "use_log_returns", False):
+                # log return: ln(P_t+h / P_t)
+                future_returns[i] = np.log(close[i + cfg.forecast_horizon] / (close[i] + 1e-10))
+            else:
+                future_returns[i] = (close[i + cfg.forecast_horizon] - close[i]) / (close[i] + 1e-10)
 
     if cfg.n_classes == 0:
         return future_returns, future_returns

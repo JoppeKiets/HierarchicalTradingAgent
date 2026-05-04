@@ -1,0 +1,96 @@
+{
+  "n_windows": 2,
+  "best_fold_idx": 1,
+  "best_fold_val_ic": 0.0334,
+  "phases": [
+    1,
+    2,
+    3
+  ],
+  "epochs": 10,
+  "expanding_window": false,
+  "purge_horizon": 0,
+  "per_window": [
+    {
+      "window": 0,
+      "dates": {
+        "train": [
+          716242,
+          726098
+        ],
+        "val": [
+          726100,
+          728211
+        ],
+        "test": [
+          728211,
+          730324
+        ]
+      },
+      "val_ic": 0.0266,
+      "regression_metrics": {
+        "ic": 0.019367001867867235,
+        "rank_ic": 0.022477144255166184,
+        "directional_accuracy": 0.5150839690429052,
+        "mse": 1.0526518245017102,
+        "n_samples": 72229
+      },
+      "long_short": {
+        "sharpe": 1.6607,
+        "max_drawdown": -0.1689,
+        "total_return": 2.2639,
+        "n_days": 1461
+      },
+      "elapsed_seconds": 589.8,
+      "n_train": 49178,
+      "n_test": 72229
+    },
+    {
+      "window": 1,
+      "dates": {
+        "train": [
+          725630,
+          735486
+        ],
+        "val": [
+          735488,
+          737599
+        ],
+        "test": [
+          737599,
+          739712
+        ]
+      },
+      "val_ic": 0.0334,
+      "regression_metrics": {
+        "ic": 0.021496471751856053,
+        "rank_ic": 0.023192233840368403,
+        "directional_accuracy": 0.5111592082673667,
+        "mse": 0.8689241500949091,
+        "n_samples": 299394
+      },
+      "long_short": {
+        "sharpe": 0.7037,
+        "max_drawdown": -0.1185,
+        "total_return": 0.4203,
+        "n_days": 1418
+      },
+      "elapsed_seconds": 4353.1,
+      "n_train": 464871,
+      "n_test": 299394
+    }
+  ],
+  "aggregate": {
+    "ic_mean": 0.0204,
+    "ic_std": 0.0011,
+    "rank_ic_mean": 0.0228,
+    "dir_acc_mean": 0.5131,
+    "sharpe_mean": 1.1822,
+    "sharpe_std": 0.4785,
+    "consistency": "2/2",
+    "val_ic_weights": [
+      0.4433,
+      0.5567
+    ]
+  }
+}

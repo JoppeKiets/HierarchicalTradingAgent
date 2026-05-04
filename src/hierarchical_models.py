@@ -86,18 +86,20 @@ class HierarchicalModelConfig:
     # Daily models
     daily_input_dim: int = 51       # Features from enhanced_features.py
     daily_seq_len: int = 720        # ~3 years
-    daily_hidden_dim: int = 128
+    daily_hidden_dim: int = 128     # LSTM hidden dim (reduced for faster training)
+    daily_tft_hidden_dim: int = 64  # TFT hidden dim (reduced)
     daily_n_layers: int = 2
-    daily_n_heads: int = 4          # For TFT
+    daily_n_heads: int = 2          # For TFT
     daily_dropout: float = 0.15
     daily_lstm_dropout: float = 0.05
 
     # Minute models
     minute_input_dim: int = 18      # Features from minute data
     minute_seq_len: int = 780       # ~2 trading days
-    minute_hidden_dim: int = 128
+    minute_hidden_dim: int = 128    # LSTM hidden dim (reduced)
+    minute_tft_hidden_dim: int = 64  # TFT hidden dim (reduced)
     minute_n_layers: int = 2
-    minute_n_heads: int = 4
+    minute_n_heads: int = 2
     minute_dropout: float = 0.15
     minute_lstm_dropout: float = 0.05
 
@@ -108,6 +110,7 @@ class HierarchicalModelConfig:
     news_n_layers: int = 2
     news_dropout: float = 0.15
     use_news_model: bool = True     # Toggle news sub-model
+    use_minute_models: bool = True  # Toggle minute sub-models (lstm_m, tft_m)
 
     # TCN (daily) — dilated causal 1D convolutions on daily data
     use_tcn_d: bool = False
@@ -128,26 +131,26 @@ class HierarchicalModelConfig:
     gnn_feature_dim: int = 64       # Dimensionality of GNN embedding to append
 
     # Shared
-    embedding_dim: int = 64         # Embedding size for all sub-models
+    embedding_dim: int = 32         # Embedding size for all sub-models (reduced)
 
     # Meta MLP
     regime_dim: int = 8             # vol_regime, vix_regime, etc.
     meta_hidden_dim: int = 128
-    meta_n_layers: int = 3
+    meta_n_layers: int = 2
     meta_dropout: float = 0.2
     n_sub_models: int = 0           # 0 = auto-compute from use_* flags
 
     def count_sub_models(self) -> int:
         """Count active sub-models from toggle flags."""
-        n = 4  # lstm_d, tft_d, lstm_m, tft_m are always present
+        n = 2  # lstm_d, tft_d are always present
+        if self.use_minute_models:
+            n += 2  # lstm_m, tft_m
         if self.use_news_model:
             n += 1
         if self.use_tcn_d:
             n += 1
         if self.use_fund_mlp:
             n += 1
-        # GNN is no longer a sub-model when use_gnn_features=True
-        # (it's now auxiliary features injected into daily/minute models)
         return n
 
     def __post_init__(self):
@@ -564,6 +567,154 @@ class _MultiHeadGraphAttentionLayer(nn.Module):
         return out
 
 
+# ============================================================================
+# GNNSubModel: GNN as a regression sub-model (like LSTM, TFT)
+# ============================================================================
+
+class GNNSubModel(nn.Module):
+    """Graph neural network sub-model that operates on correlation-based stock graphs.
+    
+    For each batch of stock sequences, builds a correlation graph and applies
+    graph attention to produce predictions and embeddings.
+    
+    Input: (batch, seq_len, input_dim) - time series for a batch of stocks
+    Output: 
+        prediction: (batch,) - scalar prediction
+        embedding: (batch, embedding_dim) - learned representation
+    """
+    
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dim: int = 64,
+        n_layers: int = 2,
+        n_heads: int = 4,
+        dropout: float = 0.15,
+        embedding_dim: int = 64,
+        correlation_threshold: float = 0.5,
+    ):
+        super().__init__()
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.embedding_dim = embedding_dim
+        self.correlation_threshold = correlation_threshold
+        
+        # Project sequence to hidden dimension
+        self.seq_proj = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+        
+        # Graph attention layers
+        self.gat_layers = nn.ModuleList()
+        self.gat_norms = nn.ModuleList()
+        for _ in range(n_layers):
+            self.gat_layers.append(
+                _MultiHeadGraphAttentionLayer(
+                    hidden_dim, hidden_dim, n_heads=n_heads, dropout=dropout
+                )
+            )
+            self.gat_norms.append(nn.LayerNorm(hidden_dim))
+        
+        # Output heads
+        self.embedding_head = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, embedding_dim),
+            nn.Tanh(),
+        )
+        
+        self.prediction_head = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim // 2, 1),
+        )
+    
+    def _compute_correlation_edges(self, x: torch.Tensor) -> torch.Tensor:
+        """Compute edges from correlation matrix.
+        
+        Args:
+            x: (batch, seq_len, hidden_dim) - projected sequences
+        
+        Returns:
+            edge_index: (2, num_edges) - edge list for fully connected batch
+        """
+        batch_size = x.shape[0]
+        
+        # Compute mean correlation across batch
+        # Flatten to (batch * seq_len, hidden_dim)
+        x_flat = x.reshape(-1, x.shape[-1])
+        
+        # Compute pairwise correlations between nodes
+        # For simplicity, use cosine similarity on sequence means
+        x_mean = x.mean(dim=1)  # (batch, hidden_dim)
+        
+        # Compute cosine similarity
+        x_norm = torch.nn.functional.normalize(x_mean, p=2, dim=-1)
+        similarity = torch.mm(x_norm, x_norm.t())  # (batch, batch)
+        
+        # Create edges for high-correlation pairs
+        edges = []
+        for i in range(batch_size):
+            for j in range(batch_size):
+                if i != j and similarity[i, j] > self.correlation_threshold:
+                    edges.append([i, j])
+        
+        if len(edges) == 0:
+            # If no edges found, create a simple chain graph
+            edges = [[i, (i + 1) % batch_size] for i in range(batch_size)]
+        
+        edge_index = torch.tensor(edges, dtype=torch.long, device=x.device).t()
+        return edge_index
+    
+    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """Forward pass.
+        
+        Args:
+            x: (batch, seq_len, input_dim) time series
+        
+        Returns:
+            {
+                "prediction": (batch,),
+                "embedding": (batch, embedding_dim),
+            }
+        """
+        batch_size = x.shape[0]
+        
+        # Project sequence: (batch, seq_len, input_dim) → (batch, seq_len, hidden_dim)
+        h = self.seq_proj(x)
+        
+        # Pool to node level: (batch, hidden_dim)
+        h = h.mean(dim=1)
+        
+        # Create batch graph edges
+        edge_index = self._compute_correlation_edges(h.unsqueeze(1))
+        
+        # Create mask for valid nodes (all nodes in this case)
+        mask = torch.ones(batch_size, dtype=torch.bool, device=x.device)
+        
+        # Apply graph attention
+        h_node = h
+        for gat, norm in zip(self.gat_layers, self.gat_norms):
+            h_new = gat(h_node, edge_index, mask=mask)
+            h_node = norm(h_node + h_new)  # residual
+        
+        # Generate outputs
+        embedding = self.embedding_head(h_node)
+        prediction = self.prediction_head(h_node).squeeze(-1)
+        
+        return {
+            "prediction": prediction,
+            "embedding": embedding,
+        }
+    
+    def count_parameters(self) -> int:
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
 class SectorGNN(nn.Module):
     """Graph neural network on sector-based stock graph.
 
@@ -741,7 +892,8 @@ class MetaMLP(nn.Module):
         weight for a sub-model; negative values decrease it.
 
         Args:
-            bias:  (n_sub_models,) tensor of logit offsets.
+            bias:  (n_sub_models,) or smaller tensor of logit offsets.
+                   If smaller than n_sub_models, only the first len(bias) elements are applied.
                    Values are *added* to the existing output-layer bias.
         """
         # self.attention is: Linear(R→32) → GELU → Linear(32→N) → Softmax
@@ -750,9 +902,24 @@ class MetaMLP(nn.Module):
         assert isinstance(attn_output_layer, nn.Linear), (
             f"Expected nn.Linear at attention[2], got {type(attn_output_layer)}"
         )
-        assert bias.shape == (self.n_sub_models,), (
-            f"Bias shape {bias.shape} != ({self.n_sub_models},)"
-        )
+        
+        # Handle cases where bias might have fewer elements than n_sub_models
+        # (e.g., from a previous model with fewer sub-models)
+        if bias.shape[0] > self.n_sub_models:
+            logger.warning(
+                f"Bias has {bias.shape[0]} elements but forecaster has {self.n_sub_models} sub-models. "
+                f"Truncating bias."
+            )
+            bias = bias[:self.n_sub_models]
+        elif bias.shape[0] < self.n_sub_models:
+            logger.warning(
+                f"Bias has {bias.shape[0]} elements but forecaster has {self.n_sub_models} sub-models. "
+                f"Padding bias with zeros."
+            )
+            # Pad with zeros for new sub-models
+            padding = torch.zeros(self.n_sub_models - bias.shape[0], device=bias.device, dtype=bias.dtype)
+            bias = torch.cat([bias, padding], dim=0)
+        
         with torch.no_grad():
             attn_output_layer.bias.add_(bias.to(attn_output_layer.bias.device))
 
@@ -797,6 +964,89 @@ class MetaMLP(nn.Module):
             "disagreement": disagreement,
         }
 
+    def count_parameters(self) -> int:
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+# ============================================================================
+# FusionMLP: Combines daily and minute meta predictions
+# ============================================================================
+
+class FusionMLP(nn.Module):
+    """Lightweight network that fuses daily and minute model predictions.
+    
+    Takes predictions from separate daily and minute meta models and combines
+    them into a single forecast using regime-aware fusion.
+    
+    Input:
+      - daily_pred: (batch,) scalar prediction from daily meta
+      - minute_pred: (batch,) scalar prediction from minute meta
+      - regime: (batch, regime_dim) regime encoding
+    
+    Output:
+      - (batch,) fused prediction
+    """
+    
+    def __init__(
+        self,
+        regime_dim: int = 8,
+        hidden_dim: int = 64,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        self.regime_dim = regime_dim
+        
+        # Input: daily_pred (1) + minute_pred (1) + regime (R)
+        input_dim = 2 + regime_dim
+        
+        self.trunk = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+        self.output_head = nn.Linear(hidden_dim // 2, 1)
+        
+        self._init_weights()
+    
+    def _init_weights(self):
+        """Initialize weights with small values."""
+        for name, p in self.named_parameters():
+            if "bias" in name:
+                nn.init.zeros_(p)
+            elif "weight" in name:
+                nn.init.normal_(p, 0.0, 0.01)
+    
+    def forward(
+        self,
+        daily_pred: torch.Tensor,  # (batch,)
+        minute_pred: torch.Tensor,  # (batch,)
+        regime: torch.Tensor,  # (batch, regime_dim)
+    ) -> torch.Tensor:
+        """Fuse daily and minute predictions.
+        
+        Args:
+            daily_pred: (batch,) predictions from daily meta model
+            minute_pred: (batch,) predictions from minute meta model
+            regime: (batch, regime_dim) regime encoding
+        
+        Returns:
+            (batch,) fused predictions
+        """
+        # Stack predictions
+        preds = torch.stack([daily_pred, minute_pred], dim=-1)  # (batch, 2)
+        
+        # Concatenate with regime
+        combined = torch.cat([preds, regime], dim=-1)  # (batch, 2 + R)
+        
+        # Forward through network
+        hidden = self.trunk(combined)
+        output = self.output_head(hidden).squeeze(-1)  # (batch,)
+        
+        return output
+    
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
@@ -881,7 +1131,7 @@ class HierarchicalForecaster(nn.Module):
         subs["tft_d"] = RegressionTFT(
             input_dim=cfg.daily_input_dim,
             seq_len=cfg.daily_seq_len,
-            hidden_dim=cfg.daily_hidden_dim,
+            hidden_dim=cfg.daily_tft_hidden_dim,  # Use TFT-optimized dim, not LSTM dim
             n_heads=cfg.daily_n_heads,
             n_layers=cfg.daily_n_layers,
             dropout=cfg.daily_dropout,
@@ -901,26 +1151,27 @@ class HierarchicalForecaster(nn.Module):
             )
             names.append("tcn_d")
 
-        # --- Minute models (always present) ---
-        subs["lstm_m"] = RegressionLSTM(
-            input_dim=cfg.minute_input_dim,
-            hidden_dim=cfg.minute_hidden_dim,
-            num_layers=cfg.minute_n_layers,
-            dropout=cfg.minute_lstm_dropout,
-            embedding_dim=cfg.embedding_dim,
-        )
-        names.append("lstm_m")
+        # --- Minute models (conditionally present) ---
+        if cfg.use_minute_models:
+            subs["lstm_m"] = RegressionLSTM(
+                input_dim=cfg.minute_input_dim,
+                hidden_dim=cfg.minute_hidden_dim,
+                num_layers=cfg.minute_n_layers,
+                dropout=cfg.minute_lstm_dropout,
+                embedding_dim=cfg.embedding_dim,
+            )
+            names.append("lstm_m")
 
-        subs["tft_m"] = RegressionTFT(
-            input_dim=cfg.minute_input_dim,
-            seq_len=cfg.minute_seq_len,
-            hidden_dim=cfg.minute_hidden_dim,
-            n_heads=cfg.minute_n_heads,
-            n_layers=cfg.minute_n_layers,
-            dropout=cfg.minute_dropout,
-            embedding_dim=cfg.embedding_dim,
-        )
-        names.append("tft_m")
+            subs["tft_m"] = RegressionTFT(
+                input_dim=cfg.minute_input_dim,
+                seq_len=cfg.minute_seq_len,
+                hidden_dim=cfg.minute_tft_hidden_dim,  # Use TFT-optimized dim, not LSTM dim
+                n_heads=cfg.minute_n_heads,
+                n_layers=cfg.minute_n_layers,
+                dropout=cfg.minute_dropout,
+                embedding_dim=cfg.embedding_dim,
+            )
+            names.append("tft_m")
 
         # --- News model (optional) ---
         self.use_news = cfg.use_news_model
@@ -1287,6 +1538,290 @@ class HierarchicalForecaster(nn.Module):
             f"  Need training (random init): {sorted(new_models) if new_models else 'none'}"
         )
         return model
+
+
+# ============================================================================
+# DailyForecaster: Daily-only pipeline (LSTM_D, TFT_D, News, DailyMeta)
+# ============================================================================
+
+class DailyForecaster(nn.Module):
+    """Forecaster that contains only daily models and daily meta.
+    
+    Contains:
+      - lstm_d, tft_d, tcn_d, gnn_d (always)
+      - daily_meta: MetaMLP that fuses 4 daily model outputs
+    
+    Does NOT contain minute models or news.
+    """
+    
+    def __init__(self, cfg: HierarchicalModelConfig):
+        super().__init__()
+        self.cfg = cfg
+        
+        # Daily models: 4 sub-models
+        self.lstm_d = RegressionLSTM(
+            input_dim=cfg.daily_input_dim,
+            hidden_dim=cfg.daily_hidden_dim,
+            num_layers=cfg.daily_n_layers,
+            dropout=cfg.daily_lstm_dropout,
+            embedding_dim=cfg.embedding_dim,
+        )
+        self.tft_d = RegressionTFT(
+            input_dim=cfg.daily_input_dim,
+            seq_len=cfg.daily_seq_len,
+            hidden_dim=cfg.daily_hidden_dim,
+            n_heads=cfg.daily_n_heads,
+            n_layers=cfg.daily_n_layers,
+            dropout=cfg.daily_dropout,
+            embedding_dim=cfg.embedding_dim,
+        )
+        self.tcn_d = RegressionTCN(
+            input_dim=cfg.daily_input_dim,
+            n_filters=cfg.daily_hidden_dim,
+            n_layers=3,
+            kernel_size=3,
+            dropout=cfg.daily_dropout,
+            embedding_dim=cfg.embedding_dim,
+        )
+        self.gnn_d = GNNSubModel(
+            input_dim=cfg.daily_input_dim,
+            hidden_dim=cfg.daily_hidden_dim,
+            n_heads=cfg.daily_n_heads,
+            embedding_dim=cfg.embedding_dim,
+        )
+        
+        # Daily meta model (4 sub-models)
+        self.daily_meta = MetaMLP(
+            embedding_dim=cfg.embedding_dim,
+            regime_dim=cfg.regime_dim,
+            hidden_dim=cfg.meta_hidden_dim,
+            n_layers=cfg.meta_n_layers,
+            dropout=cfg.meta_dropout,
+            n_sub_models=4,
+        )
+    
+    def forward(
+        self,
+        daily_x: torch.Tensor,
+        regime: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
+        """Forward pass for daily models.
+        
+        Args:
+            daily_x: (batch, seq_len, daily_input_dim)
+            regime: (batch, regime_dim)
+        
+        Returns:
+            {
+                "prediction": (batch,) final prediction from daily_meta,
+                "lstm_d_pred": (batch,) lstm_d prediction,
+                "tft_d_pred": (batch,) tft_d prediction,
+                "tcn_d_pred": (batch,) tcn_d prediction,
+                "gnn_d_pred": (batch,) gnn_d prediction,
+                "lstm_d_emb": (batch, E) lstm_d embedding,
+                "tft_d_emb": (batch, E) tft_d embedding,
+                "tcn_d_emb": (batch, E) tcn_d embedding,
+                "gnn_d_emb": (batch, E) gnn_d embedding,
+            }
+        """
+        # Daily models
+        lstm_d_out = self.lstm_d(daily_x)
+        tft_d_out = self.tft_d(daily_x)
+        tcn_d_out = self.tcn_d(daily_x)
+        gnn_d_out = self.gnn_d(daily_x)
+        
+        predictions = [
+            lstm_d_out["prediction"],
+            tft_d_out["prediction"],
+            tcn_d_out["prediction"],
+            gnn_d_out["prediction"],
+        ]
+        embeddings = [
+            lstm_d_out["embedding"],
+            tft_d_out["embedding"],
+            tcn_d_out["embedding"],
+            gnn_d_out["embedding"],
+        ]
+        
+        # Stack for meta model
+        preds_stacked = torch.stack(predictions, dim=-1)  # (batch, 4)
+        
+        # Daily meta
+        meta_out = self.daily_meta(preds_stacked, embeddings, regime)
+        
+        return {
+            "prediction": meta_out["prediction"],
+            "lstm_d_pred": lstm_d_out["prediction"],
+            "tft_d_pred": tft_d_out["prediction"],
+            "tcn_d_pred": tcn_d_out["prediction"],
+            "gnn_d_pred": gnn_d_out["prediction"],
+            "lstm_d_emb": lstm_d_out["embedding"],
+            "tft_d_emb": tft_d_out["embedding"],
+            "tcn_d_emb": tcn_d_out["embedding"],
+            "gnn_d_emb": gnn_d_out["embedding"],
+            "attention_weights": meta_out["attention_weights"],
+        }
+
+
+# ============================================================================
+# MinuteForecaster: Minute-only pipeline (LSTM_M, TFT_M, TCN_M, GNN_M, News)
+# ============================================================================
+
+class MinuteForecaster(nn.Module):
+    """Forecaster that contains only minute models and minute meta.
+    
+    Contains:
+      - lstm_m, tft_m, tcn_m, gnn_m (always)
+      - news (optional, toggled by config)
+      - minute_meta: MetaMLP that fuses minute model outputs
+    
+    Does NOT contain daily models.
+    """
+    
+    def __init__(self, cfg: HierarchicalModelConfig):
+        super().__init__()
+        self.cfg = cfg
+        
+        # Minute models: 4 sub-models
+        self.lstm_m = RegressionLSTM(
+            input_dim=cfg.minute_input_dim,
+            hidden_dim=cfg.minute_hidden_dim,
+            num_layers=cfg.minute_n_layers,
+            dropout=cfg.minute_lstm_dropout,
+            embedding_dim=cfg.embedding_dim,
+        )
+        self.tft_m = RegressionTFT(
+            input_dim=cfg.minute_input_dim,
+            seq_len=cfg.minute_seq_len,
+            hidden_dim=cfg.minute_hidden_dim,
+            n_heads=cfg.minute_n_heads,
+            n_layers=cfg.minute_n_layers,
+            dropout=cfg.minute_dropout,
+            embedding_dim=cfg.embedding_dim,
+        )
+        self.tcn_m = RegressionTCN(
+            input_dim=cfg.minute_input_dim,
+            n_filters=cfg.minute_hidden_dim,
+            n_layers=3,
+            kernel_size=3,
+            dropout=cfg.minute_dropout,
+            embedding_dim=cfg.embedding_dim,
+        )
+        self.gnn_m = GNNSubModel(
+            input_dim=cfg.minute_input_dim,
+            hidden_dim=cfg.minute_hidden_dim,
+            n_heads=cfg.minute_n_heads,
+            embedding_dim=cfg.embedding_dim,
+        )
+        
+        # News encoder (optional for minute)
+        self.use_news = cfg.use_news_model
+        if self.use_news:
+            news_cfg = NewsEncoderConfig(
+                finbert_dim=768,
+                sentiment_dim=6,
+                input_dim=cfg.news_input_dim,
+                proj_dim=cfg.news_hidden_dim,
+                hidden_dim=cfg.news_hidden_dim,
+                n_layers=cfg.news_n_layers,
+                dropout=cfg.news_dropout,
+                seq_len=cfg.news_seq_len,
+                embedding_dim=cfg.embedding_dim,
+            )
+            self.news = NewsEncoder(news_cfg)
+            n_sub_minute = 5  # lstm_m, tft_m, tcn_m, gnn_m, news
+        else:
+            n_sub_minute = 4  # lstm_m, tft_m, tcn_m, gnn_m
+        
+        # Minute meta model
+        self.minute_meta = MetaMLP(
+            embedding_dim=cfg.embedding_dim,
+            regime_dim=cfg.regime_dim,
+            hidden_dim=cfg.meta_hidden_dim,
+            n_layers=cfg.meta_n_layers,
+            dropout=cfg.meta_dropout,
+            n_sub_models=n_sub_minute,
+        )
+    
+    def forward(
+        self,
+        minute_x: torch.Tensor,
+        regime: torch.Tensor,
+        news_x: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """Forward pass for minute models.
+        
+        Args:
+            minute_x: (batch, seq_len, minute_input_dim)
+            regime: (batch, regime_dim)
+            news_x: (batch, news_seq_len, news_input_dim) if use_news=True
+        
+        Returns:
+            {
+                "prediction": (batch,) final prediction from minute_meta,
+                "lstm_m_pred": (batch,) lstm_m prediction,
+                "tft_m_pred": (batch,) tft_m prediction,
+                "tcn_m_pred": (batch,) tcn_m prediction,
+                "gnn_m_pred": (batch,) gnn_m prediction,
+                "news_pred": (batch,) news prediction (if use_news=True),
+                ... embeddings ...
+            }
+        """
+        # Minute models
+        lstm_m_out = self.lstm_m(minute_x)
+        tft_m_out = self.tft_m(minute_x)
+        tcn_m_out = self.tcn_m(minute_x)
+        gnn_m_out = self.gnn_m(minute_x)
+        
+        predictions = [
+            lstm_m_out["prediction"],
+            tft_m_out["prediction"],
+            tcn_m_out["prediction"],
+            gnn_m_out["prediction"],
+        ]
+        embeddings = [
+            lstm_m_out["embedding"],
+            tft_m_out["embedding"],
+            tcn_m_out["embedding"],
+            gnn_m_out["embedding"],
+        ]
+        
+        # News (optional)
+        if self.use_news and news_x is not None:
+            news_out = self.news(news_x)
+            predictions.append(news_out["prediction"])
+            embeddings.append(news_out["embedding"])
+        else:
+            # Zero-fill if no news
+            E = self.cfg.embedding_dim
+            if self.use_news:
+                predictions.append(torch.zeros(minute_x.shape[0], device=minute_x.device, dtype=minute_x.dtype))
+                embeddings.append(torch.zeros(minute_x.shape[0], E, device=minute_x.device, dtype=minute_x.dtype))
+        
+        # Stack for meta model
+        preds_stacked = torch.stack(predictions, dim=-1)  # (batch, n_sub)
+        
+        # Minute meta
+        meta_out = self.minute_meta(preds_stacked, embeddings, regime)
+        
+        result = {
+            "prediction": meta_out["prediction"],
+            "lstm_m_pred": lstm_m_out["prediction"],
+            "tft_m_pred": tft_m_out["prediction"],
+            "tcn_m_pred": tcn_m_out["prediction"],
+            "gnn_m_pred": gnn_m_out["prediction"],
+            "lstm_m_emb": lstm_m_out["embedding"],
+            "tft_m_emb": tft_m_out["embedding"],
+            "tcn_m_emb": tcn_m_out["embedding"],
+            "gnn_m_emb": gnn_m_out["embedding"],
+            "attention_weights": meta_out["attention_weights"],
+        }
+        
+        if self.use_news:
+            result["news_pred"] = predictions[4] if len(predictions) > 4 else None
+            result["news_emb"] = embeddings[4] if len(embeddings) > 4 else None
+        
+        return result
 
 
 # ============================================================================

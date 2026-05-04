@@ -77,7 +77,7 @@ class HierarchicalDataConfig:
 
     # Feature config for daily data
     daily_normalize: bool = True
-    daily_norm_window: int = 60
+    
 
     # Feature set: "full" (40+ features, default) or "raw_plus" (~15 stationary features)
     daily_feature_set: str = "full"
@@ -87,11 +87,24 @@ class HierarchicalDataConfig:
 
     # Minute
     minute_normalize: bool = True
-    minute_norm_window: int = 390
+    
+
+    # Use larger rolling windows by default for normalization
+    daily_norm_window: int = 252
+    minute_norm_window: int = 7800
 
     # News features
     include_news_features: bool = True
     news_lag_days: int = 1  # shift by 1 day to avoid look-ahead leakage
+    # Use log-returns for targets instead of simple returns (False = simple)
+    use_log_returns: bool = False
+    # Target transform: 'raw' | 'ewma_zscore' | ...
+    target_transform: str = "ewma_zscore"
+
+    # Walk-Forward Validation parameters
+    n_wf_windows: int = 5              # Number of expanding windows for WF CV
+    wf_expanding_window: bool = True   # True = expanding (fold 0 earliest), False = rolling
+    wf_purge_horizon: int = 0          # Will default to forecast_horizon if 0
 
 
 # ============================================================================
@@ -232,6 +245,82 @@ def _compute_daily_features(
 
     features = features.replace([np.inf, -np.inf], np.nan).fillna(0)
     return features.values.astype(np.float32), list(features.columns)
+
+
+def _build_daily_sentiment_bridge(
+    ticker: str,
+    cfg: HierarchicalDataConfig,
+    dates: np.ndarray,
+) -> Tuple[np.ndarray, str]:
+    """Build a 1-dim daily sentiment bridge for minute models.
+
+    Loads daily news sentiment (from news cache) and broadcasts to minute
+    resolution. This gives minute models *some* news context without
+    requiring expensive minute-level news data.
+
+    Args:
+        ticker: Ticker symbol
+        cfg: Config with paths
+        dates: Ordinal dates array from minute data (N_minutes,)
+
+    Returns:
+        (sentiment_arr, feature_name)
+        sentiment_arr: (N_minutes, 1) with values in [-1, 1], constant per day
+        feature_name: "news_sentiment_daily_bridge"
+    """
+    # Try to load daily news embeddings
+    news_emb_path = Path(cfg.cache_dir) / "news" / f"{ticker}_embeddings.npy"
+    news_sent_path = Path(cfg.cache_dir) / "news" / f"{ticker}_sentiment.npy"
+    news_date_path = Path(cfg.cache_dir) / "news" / f"{ticker}_dates.npy"
+
+    n_bars = len(dates)
+    feature_name = "news_sentiment_daily_bridge"
+
+    if not (news_emb_path.exists() and news_sent_path.exists() and news_date_path.exists()):
+        logger.debug(f"  {ticker}: daily news sentiment not cached, using zeros for bridge")
+        return np.zeros((n_bars, 1), dtype=np.float32), feature_name
+
+    try:
+        news_dates = np.load(news_date_path, mmap_mode="r")  # (N_days,) ordinal
+        news_sents = np.load(news_sent_path, mmap_mode="r")  # (N_days, 6)
+
+        # Extract compound sentiment: pos_prob - neg_prob (index 0 and 1)
+        # Format: [pos_mean, neg_mean, neu_mean, compound_mean, compound_std, count]
+        if news_sents.shape[1] >= 4:
+            # Use compound_mean (index 3)
+            compound_sents = news_sents[:, 3].astype(np.float64)
+        else:
+            # Fallback: compute from pos/neg
+            compound_sents = (news_sents[:, 0] - news_sents[:, 1]).astype(np.float64)
+
+        # Build lookup: ordinal_date → sentiment value
+        sentiment_lookup = {}
+        for i in range(len(news_dates)):
+            d = int(news_dates[i])
+            sentiment_lookup[d] = float(compound_sents[i])
+
+        # Align to minute dates with lag (1 day)
+        sentiment_arr = np.zeros((n_bars, 1), dtype=np.float32)
+        lag = cfg.news_lag_days
+        n_matched = 0
+
+        for bar_idx in range(n_bars):
+            # Look up sentiment from `lag` days ago
+            target_date = int(dates[bar_idx]) - lag
+            if target_date in sentiment_lookup:
+                sentiment_arr[bar_idx, 0] = float(sentiment_lookup[target_date])
+                n_matched += 1
+
+        logger.debug(
+            f"  {ticker}: daily sentiment bridge — "
+            f"{n_matched}/{n_bars} bars matched sentiment "
+            f"(match_rate={n_matched/n_bars:.1%})"
+        )
+        return sentiment_arr, feature_name
+
+    except Exception as e:
+        logger.warning(f"  {ticker}: error building sentiment bridge — {e}, using zeros")
+        return np.zeros((n_bars, 1), dtype=np.float32), feature_name
 
 
 def _safe_to_datetime(series: pd.Series) -> pd.Series:
@@ -550,8 +639,14 @@ def _normalize_array(arr: np.ndarray, window: int = 60) -> np.ndarray:
     out = np.zeros_like(arr)
     for j in range(arr.shape[1]):
         s = pd.Series(arr[:, j])
-        mu = s.rolling(window, min_periods=1).mean()
-        std = s.rolling(window, min_periods=2).std().fillna(1.0).clip(lower=1e-8)
+        min_periods = max(2, window // 2)
+        mu = s.rolling(window, min_periods=min_periods).mean()
+        std = s.rolling(window, min_periods=min_periods).std()
+        # Fill early NaNs with global stats (more stable than tiny-window estimates)
+        global_mu = s.mean()
+        global_std = s.std() if s.std() > 1e-8 else 1.0
+        mu = mu.fillna(global_mu)
+        std = std.fillna(global_std).clip(lower=1e-8)
         out[:, j] = ((s - mu) / std).clip(-5, 5).fillna(0).values
     return out.astype(np.float32)
 
@@ -655,12 +750,56 @@ def preprocess_daily_ticker(
         open_ = df["open"].values.astype(np.float64)
         intra = np.where(open_ > 0, (close - open_) / open_, 0.0).astype(np.float32)
         targets[:] = np.clip(intra, -0.20, 0.20)
+        raw_for_backtest = targets.copy()  # already raw returns for intraday target
     else:
         valid = close[:-cfg.forecast_horizon] > 0
-        ret = np.where(valid,
-            close[cfg.forecast_horizon:] / np.clip(close[:-cfg.forecast_horizon], 1e-8, None) - 1.0,
-            0.0)
-        targets[:-cfg.forecast_horizon] = np.clip(ret, -0.20, 0.20).astype(np.float32)
+        # Compute raw forward returns array (aligned to index i -> return for i -> i+H)
+        if getattr(cfg, "use_log_returns", False):
+            with np.errstate(divide='ignore', invalid='ignore'):
+                ret = np.full(len(close), np.nan, dtype=np.float64)
+                ret[:-cfg.forecast_horizon] = np.where(
+                    valid,
+                    np.log(
+                        np.clip(close[cfg.forecast_horizon:], 1e-8, None)
+                        / np.clip(close[:-cfg.forecast_horizon], 1e-8, None)
+                    ),
+                    np.nan,
+                )
+        else:
+            ret = np.full(len(close), np.nan, dtype=np.float64)
+            ret[:-cfg.forecast_horizon] = np.where(
+                valid,
+                close[cfg.forecast_horizon:] / np.clip(close[:-cfg.forecast_horizon], 1e-8, None) - 1.0,
+                np.nan,
+            )
+
+        # Always compute raw clipped returns for backtesting P&L (never compound z-scores)
+        raw_for_backtest = np.full(len(close), np.nan, dtype=np.float32)
+        _raw_clip = np.where(np.isfinite(ret), np.clip(ret, -0.20, 0.20), np.nan)
+        raw_for_backtest[:-cfg.forecast_horizon] = np.where(
+            np.isfinite(_raw_clip[:-cfg.forecast_horizon]),
+            _raw_clip[:-cfg.forecast_horizon],
+            0.0,
+        ).astype(np.float32)
+
+        # Apply target transform
+        transform = getattr(cfg, "target_transform", "ewma_zscore")
+        if transform == "ewma_zscore":
+            # Winsorize raw returns at +/-20% before sigma estimation
+            winsor = np.clip(ret, -0.20, 0.20)
+
+            # EWMA sigma with span = daily_norm_window, shifted by 1 to avoid look-ahead
+            span = int(getattr(cfg, "daily_norm_window", 60))
+            sigma_series = pd.Series(winsor).shift(1).ewm(span=span, adjust=False).std()
+            sigma = sigma_series.fillna(1.0).clip(lower=1e-8).values
+
+            # Standardized target: winsorized_return / ewma_sigma, then clip to +-5
+            std_target = np.where(np.isfinite(sigma) & (sigma > 0), winsor / sigma, 0.0)
+            targets[:-cfg.forecast_horizon] = np.clip(std_target[:-cfg.forecast_horizon], -5.0, 5.0).astype(np.float32)
+        else:
+            # Fallback: original behaviour (clip raw returns at 20%)
+            raw = np.where(np.isnan(ret), 0.0, ret)
+            targets[:-cfg.forecast_horizon] = np.clip(raw[:-cfg.forecast_horizon], -0.20, 0.20).astype(np.float32)
 
     # Save ordinal dates for meta-model alignment and regime lookup
     if date_col is not None:
@@ -674,6 +813,9 @@ def preprocess_daily_ticker(
     np.save(feat_path, feat_arr)
     np.save(tgt_path, targets)
     np.save(date_path, ordinal_dates)
+    # Save raw (unscaled) returns for backtesting — never use z-scores as P&L
+    raw_tgt_path = cache / f"{ticker}_raw_targets.npy"
+    np.save(raw_tgt_path, raw_for_backtest)
 
     return {
         "ticker": ticker,
@@ -702,12 +844,22 @@ def preprocess_minute_ticker(
     tgt_path = cache / f"{ticker}_targets.npy"
     date_path = cache / f"{ticker}_dates.npy"
 
-    if not force and feat_path.exists() and tgt_path.exists() and date_path.exists():
-        feat = np.load(feat_path, mmap_mode="r")
-        return {"ticker": ticker, "n_rows": feat.shape[0], "n_features": feat.shape[1]}
-
     minute_file = Path(cfg.minute_dir) / f"{ticker}.parquet"
     daily_file = Path(cfg.organized_dir) / ticker / "price_history.csv"
+
+    if not force and feat_path.exists() and tgt_path.exists() and date_path.exists():
+        # Auto-invalidate stale cache: if the raw parquet is newer than the
+        # cached features, the cache was built from older data and must be
+        # regenerated so the test split reflects the latest collected bars.
+        cache_mtime = feat_path.stat().st_mtime
+        if minute_file.exists() and minute_file.stat().st_mtime > cache_mtime:
+            logger.debug(
+                f"  {ticker}: minute cache is stale (parquet newer by "
+                f"{minute_file.stat().st_mtime - cache_mtime:.0f}s) — regenerating"
+            )
+        else:
+            feat = np.load(feat_path, mmap_mode="r")
+            return {"ticker": ticker, "n_rows": feat.shape[0], "n_features": feat.shape[1]}
 
     if not minute_file.exists() or not daily_file.exists():
         return None
@@ -735,6 +887,27 @@ def preprocess_minute_ticker(
     daily_close = daily.set_index("date")["close"].to_dict()
 
     feat_arr, names = _compute_minute_features(mdf)
+
+    # Save ordinal dates early (needed for sentiment bridge alignment)
+    dates = mdf["date"].values
+    ordinal_dates = np.array(
+        [d.toordinal() if hasattr(d, 'toordinal') else 0 for d in dates],
+        dtype=np.int32,
+    )
+
+    # ------------------------------------------------------------------
+    # Optional: add daily sentiment bridge (1-dim news context)
+    # ------------------------------------------------------------------
+    # This is a lightweight alternative to full minute-level news.
+    # Broadcasts daily news sentiment to all 390 minute bars.
+    # Gives minute models *some* news context without expensive data collection.
+    # Controlled by cfg.include_news_features.
+    if cfg.include_news_features:
+        sentiment_arr, sent_name = _build_daily_sentiment_bridge(
+            ticker, cfg, ordinal_dates
+        )
+        feat_arr = np.concatenate([feat_arr, sentiment_arr], axis=1)
+        names = names + [sent_name]
 
     # ------------------------------------------------------------------
     # Append 774-dim per-article news features (intraday-aligned)
@@ -769,14 +942,19 @@ def preprocess_minute_ticker(
                     news_arr[i] = cached_news[idx]
     else:
         logger.debug(
-            f"  {ticker}: minute_news cache missing — zero-filling {NEWS_DIM} dims. "
+            f"  {ticker}: minute_news cache missing — skipping news features. "
             f"Run scripts/align_news_to_minute.py to build it."
         )
         news_arr = np.zeros((n_bars, NEWS_DIM), dtype=np.float32)
 
-    news_names = [f"news_{i}" for i in range(NEWS_DIM)]
-    feat_arr   = np.concatenate([feat_arr, news_arr], axis=1)
-    names      = names + news_names
+    # NOTE: News features are now handled by the dedicated NewsEncoder sub-model,
+    # NOT concatenated into minute features. This keeps minute_input_dim small (~18)
+    # and prevents TFT_M from ballooning to 47M parameters.
+    # Concatenating 774-dim news into minute features caused parameter explosion:
+    # 18 + 774 = 792 features → 47M params instead of 1M.
+    # news_names = [f"news_{i}" for i in range(NEWS_DIM)]
+    # feat_arr   = np.concatenate([feat_arr, news_arr], axis=1)
+    # names      = names + news_names
 
     if cfg.minute_normalize:
         feat_arr = _normalize_array(feat_arr, cfg.minute_norm_window)
@@ -788,23 +966,36 @@ def preprocess_minute_ticker(
     targets = np.full(len(mdf), np.nan, dtype=np.float32)
     valid_mask = (close_vals[:-H] > 0) if H < len(close_vals) else np.array([], dtype=bool)
     if len(valid_mask) > 0:
-        fwd_ret = np.where(
-            valid_mask,
-            close_vals[H:] / np.clip(close_vals[:-H], 1e-8, None) - 1.0,
-            np.nan,
-        )
-        targets[:len(fwd_ret)] = fwd_ret.astype(np.float32)
+        if getattr(cfg, "use_log_returns", False):
+            with np.errstate(divide='ignore', invalid='ignore'):
+                fwd_ret = np.where(
+                    valid_mask,
+                    np.log(np.clip(close_vals[H:], 1e-8, None) / np.clip(close_vals[:-H], 1e-8, None)),
+                    np.nan,
+                )
+        else:
+            fwd_ret = np.where(
+                valid_mask,
+                close_vals[H:] / np.clip(close_vals[:-H], 1e-8, None) - 1.0,
+                np.nan,
+            )
+        # Place forward returns into full-length array for transform
+        full_ret = np.full(len(mdf), np.nan, dtype=np.float64)
+        full_ret[: len(fwd_ret)] = fwd_ret
 
-    # Clip extreme targets to improve stability
-    targets = np.clip(targets, -0.20, 0.20, out=targets)
+        transform = getattr(cfg, "target_transform", "ewma_zscore")
+        if transform == "ewma_zscore":
+            # Winsorize at +/-20% before sigma estimation
+            winsor = np.clip(full_ret, -0.20, 0.20)
+            span = int(getattr(cfg, "minute_norm_window", 390))
+            sigma_series = pd.Series(winsor).shift(1).ewm(span=span, adjust=False).std()
+            sigma = sigma_series.fillna(1.0).clip(lower=1e-8).values
+            std_target = np.where(np.isfinite(sigma) & (sigma > 0), winsor / sigma, 0.0)
+            targets[: len(fwd_ret)] = np.clip(std_target[: len(fwd_ret)], -5.0, 5.0).astype(np.float32)
+        else:
+            targets[: len(fwd_ret)] = np.clip(fwd_ret, -0.20, 0.20).astype(np.float32)
 
-    # Save ordinal dates for meta-model alignment and regime lookup
-    dates = mdf["date"].values
-    ordinal_dates = np.array(
-        [d.toordinal() if hasattr(d, 'toordinal') else 0 for d in dates],
-        dtype=np.int32,
-    )
-
+    # ordinal_dates already computed at top of feature preprocessing
     np.save(feat_path, feat_arr)
     np.save(tgt_path, targets)
     np.save(date_path, ordinal_dates)
@@ -946,6 +1137,14 @@ class LazyDailyDataset(Dataset):
         seq = feat[row - self.cfg.daily_seq_len : row].copy()  # copy from mmap
         target = float(tgt[row])
 
+        # Load raw (unscaled) target for backtesting; fall back to z-scored if missing
+        raw_tgt_path = self.cache / f"{ticker}_raw_targets.npy"
+        if raw_tgt_path.exists():
+            raw_tgt = np.load(raw_tgt_path, mmap_mode="r")
+            raw_target = float(raw_tgt[row]) if np.isfinite(raw_tgt[row]) else 0.0
+        else:
+            raw_target = target  # fallback: will still be wrong if z-scored
+
         # Load ordinal date for regime lookup / meta alignment
         date_path = self.cache / f"{ticker}_dates.npy"
         if date_path.exists():
@@ -957,6 +1156,7 @@ class LazyDailyDataset(Dataset):
         return (
             torch.from_numpy(seq),
             torch.tensor(target, dtype=torch.float32),
+            torch.tensor(raw_target, dtype=torch.float32),
             ordinal_date,
             ticker,
         )
@@ -1068,6 +1268,7 @@ class LazyMinuteDataset(Dataset):
         return (
             torch.from_numpy(seq),
             torch.tensor(target, dtype=torch.float32),
+            torch.tensor(target, dtype=torch.float32),  # raw_target placeholder (minute has no separate raw)
             ordinal_date,
             ticker,
         )
@@ -1341,6 +1542,7 @@ class LazyFundamentalDataset(Dataset):
         return (
             torch.from_numpy(features_vec),
             torch.tensor(target, dtype=torch.float32),
+            torch.tensor(target, dtype=torch.float32),  # raw_target placeholder
             ordinal_date,
             ticker,
         )

@@ -59,6 +59,9 @@ class NewsDataConfig:
     temporal_train_frac: float = 0.70
     temporal_val_frac: float = 0.15
     temporal_test_frac: float = 0.15
+    # Minimum coverage filters (exclude very-low-coverage tickers)
+    min_news_days: int = 30        # Exclude tickers with fewer real news days
+    min_news_density: float = 0.05 # Exclude if <5% of seq days have news
 
 
 def preprocess_news_ticker(
@@ -89,7 +92,14 @@ def preprocess_news_ticker(
 
     if not force and feat_path.exists() and date_path.exists():
         feat = np.load(feat_path, mmap_mode="r")
-        return {"ticker": ticker, "n_rows": feat.shape[0], "n_features": feat.shape[1]}
+        # Report whether this cached feature file actually contains any news
+        has_news = bool(np.abs(feat).sum() > 1e-6)
+        return {
+            "ticker": ticker,
+            "n_rows": feat.shape[0],
+            "n_features": feat.shape[1],
+            "has_news": has_news,
+        }
 
     # Load daily dates (these define the timeline)
     daily_date_path = Path(daily_cache_dir) / f"{ticker}_dates.npy"
@@ -230,6 +240,18 @@ class LazyNewsDataset(Dataset):
                 continue
 
             feat = np.load(feat_path, mmap_mode="r")
+            # Skip tickers whose feature file is entirely zero (no news coverage)
+            if np.abs(feat).sum() < 1e-6:
+                continue
+
+            # Enforce minimum coverage: number of days with real news and density
+            # Count days with real news signal (non-zero row)
+            news_days = int((np.abs(feat).sum(axis=1) > 1e-6).sum())
+            news_density = news_days / max(feat.shape[0], 1)
+
+            if news_days < news_cfg.min_news_days or news_density < news_cfg.min_news_density:
+                # Long tail — exclude from training entirely
+                continue
             n_rows = feat.shape[0]
             tgt = np.load(daily_tgt_path, mmap_mode="r")
             end = n_rows - news_cfg.forecast_horizon
@@ -241,8 +263,11 @@ class LazyNewsDataset(Dataset):
                 if i - news_cfg.seq_len >= 0 and not np.isnan(tgt[i]):
                     self.index.append((ticker, i))
 
-        logger.info(f"LazyNewsDataset[{split_name}]: {len(self.index):,} sequences "
-                    f"from {len(tickers)} tickers, {self.n_features} features")
+        n_tickers_with_sequences = len(set([t for t, _ in self.index]))
+        logger.info(
+            f"LazyNewsDataset[{split_name}]: {len(self.index):,} sequences "
+            f"from {n_tickers_with_sequences} tickers (of {len(tickers)}), {self.n_features} features"
+        )
 
     def _temporal_bounds(self, warmup: int, end: int, cfg: NewsDataConfig) -> Tuple[int, int]:
         if cfg.split_mode != "temporal":
@@ -279,11 +304,23 @@ class LazyNewsDataset(Dataset):
         else:
             ordinal_date = 0
 
+        # Per-window news presence mask (seq_len,)
+        news_day_mask = (np.abs(seq).sum(axis=1) > 1e-6)
+
+        # Simple window density (fraction of days with news)
+        window_density = float(news_day_mask.mean())
+
+        # Recency-weighted density: recent news matters more for short-horizon prediction
+        recency_weights = np.linspace(0.5, 1.0, len(news_day_mask), dtype=np.float32)
+        # Multiply boolean mask by weights (auto-cast to float), normalize
+        weighted_density = float((news_day_mask.astype(np.float32) * recency_weights).sum() / recency_weights.sum())
+
         return (
             torch.from_numpy(seq),
             torch.tensor(target, dtype=torch.float32),
             ordinal_date,
             ticker,
+            torch.tensor(weighted_density, dtype=torch.float32),
         )
 
 
