@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""Live trading dashboard — reads portfolio.json and ledger.jsonl.
+"""Live trading dashboard — reads directly from the Alpaca paper account.
 
-Prints a colour-coded terminal view of:
-  • Current portfolio equity vs benchmark (SPY)
-  • Open positions with live unrealised P&L
-  • Closed trade history with wins/losses highlighted
-  • Equity curve (ASCII spark-line)
-  • Summary statistics
+Shows:
+  • Account equity vs starting capital / SPY benchmark
+  • Open Alpaca positions with live unrealised P&L + ML signal metadata
+  • Recent filled orders (last 20 closed trades)
+  • Equity sparkline from local equity_curve.json
 
 Usage
 -----
-  python scripts/trading_dashboard.py                   # one-shot print
-  python scripts/trading_dashboard.py --watch           # refresh every 60 s
-  python scripts/trading_dashboard.py --data-dir data/paper_trading
+  python scripts/trading_dashboard.py              # one-shot print
+  python scripts/trading_dashboard.py --watch      # refresh every 60 s
+  python scripts/trading_dashboard.py --interval 30
 """
-
 from __future__ import annotations
 
 import argparse
@@ -29,126 +27,105 @@ from typing import Any, Dict, List, Optional
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# ── Colour helpers (pure ANSI — no third-party deps) ──────────────────────
+# ── ANSI colours ─────────────────────────────────────────────────────────────
+RESET  = "\033[0m";  BOLD   = "\033[1m"
+RED    = "\033[31m"; GREEN  = "\033[32m"; YELLOW = "\033[33m"
+CYAN   = "\033[36m"; WHITE  = "\033[37m"; GREY   = "\033[90m"
 
-RESET  = "\033[0m"
-BOLD   = "\033[1m"
-RED    = "\033[31m"
-GREEN  = "\033[32m"
-YELLOW = "\033[33m"
-CYAN   = "\033[36m"
-WHITE  = "\033[37m"
-GREY   = "\033[90m"
-BG_DARK = "\033[40m"
-
-
-def _c(text: str, *codes: str) -> str:
+def _c(text, *codes):
     return "".join(codes) + str(text) + RESET
 
+def _pnl(val: float) -> str:
+    s = f"{val:>+10.2f}"
+    return _c(s, GREEN, BOLD) if val > 0 else (_c(s, RED, BOLD) if val < 0 else _c(s, WHITE))
 
-def _pnl_color(val: float) -> str:
-    if val > 0:
-        return _c(f"{val:>+10.2f}", GREEN, BOLD)
-    elif val < 0:
-        return _c(f"{val:>+10.2f}", RED, BOLD)
-    return _c(f"{val:>+10.2f}", WHITE)
-
-
-def _pct_color(val: float) -> str:
+def _pct(val: float) -> str:
     s = f"{val:>+7.2f}%"
-    if val > 0:
-        return _c(s, GREEN)
-    elif val < 0:
-        return _c(s, RED)
-    return _c(s, WHITE)
-
-
-# ── Spark-line ─────────────────────────────────────────────────────────────
+    return _c(s, GREEN) if val > 0 else (_c(s, RED) if val < 0 else _c(s, WHITE))
 
 _SPARKS = "▁▂▃▄▅▆▇█"
 
-def sparkline(values: List[float], width: int = 40) -> str:
+def sparkline(values: List[float], width: int = 50) -> str:
     if not values:
         return ""
-    # Downsample to width
-    step = max(1, len(values) // width)
+    step    = max(1, len(values) // width)
     sampled = [values[i] for i in range(0, len(values), step)][-width:]
-    lo, hi = min(sampled), max(sampled)
+    lo, hi  = min(sampled), max(sampled)
     if hi == lo:
         return _SPARKS[3] * len(sampled)
     chars = [_SPARKS[int((v - lo) / (hi - lo) * (len(_SPARKS) - 1))] for v in sampled]
-    # Colour the last value
-    last_idx = int((sampled[-1] - lo) / (hi - lo) * (len(_SPARKS) - 1))
-    color = GREEN if sampled[-1] >= sampled[0] else RED
+    color  = GREEN if sampled[-1] >= sampled[0] else RED
     return "".join(chars[:-1]) + _c(chars[-1], color, BOLD)
 
 
-# ── Portfolio loading ──────────────────────────────────────────────────────
+# ── Alpaca helpers ────────────────────────────────────────────────────────────
 
-def load_portfolio(data_dir: Path) -> Optional[Dict[str, Any]]:
-    path = data_dir / "portfolio.json"
-    if not path.exists():
-        return None
-    with open(path) as f:
-        return json.load(f)
-
-
-def load_ledger(data_dir: Path) -> List[Dict[str, Any]]:
-    path = data_dir / "ledger.jsonl"
-    if not path.exists():
-        return []
-    entries = []
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
-    return entries
+def _load_clients():
+    from dotenv import load_dotenv
+    load_dotenv(PROJECT_ROOT / ".env")
+    api_key    = os.environ.get("ALPACA_API_KEY", "")
+    secret_key = os.environ.get("ALPACA_SECRET_KEY", "")
+    if not api_key or not secret_key:
+        raise EnvironmentError("ALPACA_API_KEY / ALPACA_SECRET_KEY not set in .env")
+    from alpaca.trading.client import TradingClient
+    from alpaca.data.historical import StockHistoricalDataClient
+    return (TradingClient(api_key, secret_key, paper=True),
+            StockHistoricalDataClient(api_key, secret_key))
 
 
-# ── Live price fetch (lightweight, no pandas needed here) ─────────────────
-
-def fetch_prices_simple(tickers: List[str], cache_dir: Path) -> Dict[str, float]:
-    """Read from today's price cache if available, else call yfinance."""
-    today = date.today().isoformat()
-    cache_file = cache_dir / f"prices_{today}.json"
-    if cache_file.exists():
-        with open(cache_file) as f:
-            cached = json.load(f)
-        if all(t in cached for t in tickers):
-            return {t: cached[t] for t in tickers if t in cached}
-    # Fetch missing
-    missing = [t for t in tickers if not (cache_file.exists() and t in json.load(open(cache_file)))]
-    if not missing:
-        return {t: json.load(open(cache_file))[t] for t in tickers}
-    try:
-        import yfinance as yf
-        raw = yf.download(missing, period="2d", interval="1d", progress=False, auto_adjust=True)
-        prices: Dict[str, float] = {}
-        if raw is not None and not raw.empty:
-            close = raw["Close"] if "Close" in raw.columns else raw
-            if hasattr(close, "columns"):
-                for t in missing:
-                    if t in close.columns:
-                        s = close[t].dropna()
-                        if not s.empty:
-                            prices[t] = float(s.iloc[-1])
-            else:
-                s = close.dropna()
-                if not s.empty:
-                    prices[missing[0]] = float(s.values[-1])
-        return prices
-    except Exception:
-        return {}
+def _alpaca_account(tc) -> Dict[str, float]:
+    a = tc.get_account()
+    return {
+        "equity":        float(a.equity),
+        "cash":          float(a.cash),
+        "buying_power":  float(a.buying_power),
+        "portfolio_value": float(a.portfolio_value),
+    }
 
 
-# ── SPY benchmark fetch ────────────────────────────────────────────────────
+def _alpaca_positions(tc) -> List[Dict[str, Any]]:
+    result = []
+    for p in tc.get_all_positions():
+        result.append({
+            "ticker":          p.symbol,
+            "qty":             float(p.qty),
+            "side":            "long" if float(p.qty) > 0 else "short",
+            "avg_entry_price": float(p.avg_entry_price),
+            "current_price":   float(p.current_price),
+            "unrealized_pl":   float(p.unrealized_pl),
+            "unrealized_plpc": float(p.unrealized_plpc) * 100,
+            "market_value":    float(p.market_value),
+        })
+    return result
 
-def fetch_spy_return(start_date: str, cache_dir: Path) -> float:
-    """Total return of SPY from start_date to today."""
+
+def _alpaca_recent_orders(tc, limit: int = 20) -> List[Dict[str, Any]]:
+    from alpaca.trading.requests import GetOrdersRequest
+    from alpaca.trading.enums import QueryOrderStatus
+    orders = tc.get_orders(filter=GetOrdersRequest(status=QueryOrderStatus.CLOSED, limit=limit))
+    result = []
+    for o in orders:
+        status_str = str(o.status).split(".")[-1].lower()
+        if status_str not in ("filled", "partially_filled"):
+            continue
+        qty = float(getattr(o, "filled_qty", 0) or 0)
+        avg = float(getattr(o, "filled_avg_price", 0) or 0)
+        if qty == 0:
+            continue
+        result.append({
+            "order_id":   str(o.id),
+            "ticker":     o.symbol,
+            "side":       str(o.side).split(".")[-1].lower(),
+            "qty":        qty,
+            "price":      avg,
+            "filled_at":  str(getattr(o, "filled_at", ""))[:10],
+            "type":       str(getattr(o, "order_type", "")).split(".")[-1].lower(),
+        })
+    return result
+
+
+def _spy_return(start_date: str) -> float:
+    """SPY total return from start_date to today (%)."""
     try:
         import yfinance as yf
         spy = yf.download("SPY", start=start_date, interval="1d",
@@ -156,183 +133,125 @@ def fetch_spy_return(start_date: str, cache_dir: Path) -> float:
         if spy is None or spy.empty:
             return 0.0
         close = spy["Close"].dropna()
-        if len(close) < 2:
-            return 0.0
-        return float((close.iloc[-1] / close.iloc[0]) - 1) * 100
+        return float((close.iloc[-1] / close.iloc[0] - 1) * 100) if len(close) >= 2 else 0.0
     except Exception:
         return 0.0
 
 
-# ── Main display ───────────────────────────────────────────────────────────
+# ── ML metadata (local) ───────────────────────────────────────────────────────
+
+def _load_ml_meta(data_dir: Path) -> Dict[str, Any]:
+    path = data_dir / "ml_metadata.json"
+    if not path.exists():
+        return {}
+    with open(path) as f:
+        return json.load(f)
+
+
+def _load_equity_curve(data_dir: Path) -> List[Dict[str, Any]]:
+    path = data_dir / "equity_curve.json"
+    if not path.exists():
+        return []
+    with open(path) as f:
+        return json.load(f)
+
+
+# ── Main render ───────────────────────────────────────────────────────────────
 
 def render_dashboard(data_dir: Path) -> None:
-    portfolio_data = load_portfolio(data_dir)
-    if portfolio_data is None:
-        print(_c("  No portfolio found at " + str(data_dir / "portfolio.json"), YELLOW))
-        print("  Run:  python scripts/paper_trader.py  to start\n")
+    try:
+        tc, dc = _load_clients()
+    except Exception as e:
+        print(_c(f"\n  ✗ Could not connect to Alpaca: {e}\n", RED, BOLD))
         return
 
-    ledger = load_ledger(data_dir)
+    try:
+        acct      = _alpaca_account(tc)
+        positions = _alpaca_positions(tc)
+        orders    = _alpaca_recent_orders(tc)
+    except Exception as e:
+        print(_c(f"\n  ✗ Alpaca API error: {e}\n", RED, BOLD))
+        return
 
-    starting_capital = portfolio_data.get("starting_capital", 100_000.0)
-    cash = portfolio_data.get("cash", starting_capital)
-    open_positions = portfolio_data.get("positions", [])
-    closed_trades  = portfolio_data.get("closed_trades", [])
-    equity_curve   = portfolio_data.get("equity_curve", [])
+    ml_meta    = _load_ml_meta(data_dir)
+    curve      = _load_equity_curve(data_dir)
+    starting   = float(ml_meta.get("_starting_capital", acct["equity"]))
+    total_ret  = (acct["equity"] / starting - 1) * 100 if starting else 0.0
 
-    # ── Live prices for open positions ────────────────────────────────
-    open_tickers = [p["ticker"] for p in open_positions]
-    prices = fetch_prices_simple(open_tickers, data_dir / "price_cache") if open_tickers else {}
+    # SPY benchmark
+    spy_ret = 0.0
+    if curve:
+        spy_ret = _spy_return(curve[0]["date"])
+    alpha = total_ret - spy_ret
 
-    # ── Compute current equity ────────────────────────────────────────
-    equity = cash
-    for pos in open_positions:
-        cur = prices.get(pos["ticker"], pos["entry_price"])
-        if pos["direction"] == "long":
-            equity += cur * pos["shares"]
-        else:
-            equity += (pos["entry_price"] - cur) * pos["shares"]
-
-    total_return_pct = (equity / starting_capital - 1) * 100
-    total_pnl = equity - starting_capital
-
-    # Benchmark
-    if equity_curve:
-        start_date = equity_curve[0]["date"]
-        spy_return = fetch_spy_return(start_date, data_dir / "price_cache")
-    else:
-        spy_return = 0.0
-
-    alpha = total_return_pct - spy_return
-
-    # ── Win/loss stats ─────────────────────────────────────────────────
-    realized_pnls = []
-    for t in closed_trades:
-        if t.get("exit_price") is not None:
-            ep, xp, sh, d = t["entry_price"], t["exit_price"], t["shares"], t["direction"]
-            pnl = (xp - ep) * sh if d == "long" else (ep - xp) * sh
-            realized_pnls.append(pnl)
-
-    wins  = sum(1 for v in realized_pnls if v > 0)
-    total = len(realized_pnls)
-    win_rate = wins / total if total else 0.0
-    avg_win  = sum(v for v in realized_pnls if v > 0) / max(1, wins)
-    avg_loss = sum(v for v in realized_pnls if v < 0) / max(1, total - wins)
-    pf = sum(v for v in realized_pnls if v > 0) / max(1e-9, -sum(v for v in realized_pnls if v < 0))
-
-    # Exit reason breakdown
-    reasons: Dict[str, int] = {}
-    for t in closed_trades:
-        r = t.get("exit_reason", "unknown")
-        reasons[r] = reasons.get(r, 0) + 1
-
-    # ── Header ────────────────────────────────────────────────────────
     W = 72
     print()
-    print(_c(f"{'═'*W}", CYAN))
-    print(_c(f"  📈  PAPER TRADING DASHBOARD   —   {date.today().isoformat()}", CYAN, BOLD))
-    print(_c(f"{'═'*W}", CYAN))
+    print(_c("═" * W, CYAN))
+    print(_c(f"  📈  ALPACA PAPER TRADING DASHBOARD  —  {date.today().isoformat()}", CYAN, BOLD))
+    print(_c("═" * W, CYAN))
 
-    # Equity summary
-    print(f"\n  {'Starting capital':<24}  ${starting_capital:>12,.2f}")
-    print(f"  {'Current equity':<24}  ${equity:>12,.2f}   {_pct_color(total_return_pct)}")
-    print(f"  {'Realised P&L':<24}  {_pnl_color(sum(realized_pnls))}")
-    print(f"  {'Unrealised P&L':<24}  {_pnl_color(equity - cash - sum(realized_pnls) if realized_pnls else equity - starting_capital)}")
-    print(f"  {'Cash available':<24}  ${cash:>12,.2f}")
-    spy_str = _pct_color(spy_return)
-    alpha_str = _pct_color(alpha)
-    print(f"  {'SPY since inception':<24}  {spy_str}   alpha {alpha_str}")
+    # ── Account summary ────────────────────────────────────────────────────
+    print(f"\n  {'Starting capital':<26}  ${starting:>12,.2f}")
+    print(f"  {'Current equity':<26}  ${acct['equity']:>12,.2f}   {_pct(total_ret)}")
+    print(f"  {'Cash':<26}  ${acct['cash']:>12,.2f}")
+    print(f"  {'Buying power':<26}  ${acct['buying_power']:>12,.2f}")
+    print(f"  {'SPY since inception':<26}  {_pct(spy_ret)}   alpha {_pct(alpha)}")
 
     # Equity sparkline
-    if equity_curve:
-        vals = [s["equity"] for s in equity_curve]
+    if curve:
+        vals = [s["equity"] for s in curve]
         print(f"\n  Equity  {sparkline(vals, width=50)}")
-        print(f"  {'':8}  ${min(vals):,.0f} ←  → ${max(vals):,.0f}")
+        print(f"          ${min(vals):,.0f} ← → ${max(vals):,.0f}")
+        print(f"\n  Recent snapshots (last 5 days):")
+        for snap in curve[-5:]:
+            d = snap.get("pnl_today", 0)
+            print(f"    {snap['date']}  equity=${snap['equity']:>10,.2f}  "
+                  f"daily={d:>+8.2f}  pos={snap.get('open_positions', 0)}")
 
-    # ── Stats ─────────────────────────────────────────────────────────
-    print(f"\n  {_c('TRADE STATISTICS', BOLD)}")
-    print(f"  {'─'*(W-2)}")
-    print(f"  {'Closed trades':<24}  {total}")
-    win_str = _c(f"{win_rate*100:.1f}%", GREEN if win_rate >= 0.5 else RED)
-    print(f"  {'Win rate':<24}  {win_str}   ({wins}W / {total-wins}L)")
-    print(f"  {'Avg win':<24}  {_pnl_color(avg_win)}")
-    print(f"  {'Avg loss':<24}  {_pnl_color(avg_loss)}")
-    pf_str = _c(f"{pf:.2f}", GREEN if pf >= 1.0 else RED)
-    print(f"  {'Profit factor':<24}  {pf_str}")
-    if reasons:
-        print(f"  {'Exit reasons':<24}  " +
-              "  ".join(f"{_c(k, GREY)}={v}" for k, v in sorted(reasons.items())))
-
-    # ── Open positions ────────────────────────────────────────────────
-    print(f"\n  {_c('OPEN POSITIONS', BOLD)}  ({len(open_positions)})")
-    if open_positions:
+    # ── Open positions ─────────────────────────────────────────────────────
+    print(f"\n  {_c('OPEN POSITIONS', BOLD)}  ({len(positions)})")
+    if positions:
         print(f"  {'─'*(W-2)}")
-        hdr = (f"  {'TICKER':<8} {'DIR':<6} {'ENTRY':>8} {'NOW':>8}"
-               f" {'SHARES':>7} {'UNRL P&L':>10} {'%':>8}  {'STOP':>8}  {'TP':>8}  {'DAYS':>4}")
+        hdr = (f"  {'TICKER':<8} {'SIDE':<6} {'ENTRY':>8} {'NOW':>8}"
+               f" {'QTY':>8} {'UNRL P&L':>10} {'%':>8}  {'STOP':>8}  {'TP':>8}  REGIME")
         print(_c(hdr, GREY))
-        for pos in sorted(open_positions, key=lambda p: abs(
-                (prices.get(p["ticker"], p["entry_price"]) - p["entry_price"]) / max(1, p["entry_price"])
-            ), reverse=True):
-            cur  = prices.get(pos["ticker"], pos["entry_price"])
-            ep   = pos["entry_price"]
-            sh   = pos["shares"]
-            d    = pos["direction"]
-            pnl_d = (cur - ep)*sh if d == "long" else (ep - cur)*sh
-            pnl_p = ((cur - ep)/ep if d == "long" else (ep - cur)/ep) * 100
-            days  = (date.today() - date.fromisoformat(pos["entry_date"])).days
-            stop  = pos.get("stop_loss", 0)
-            tp    = pos.get("take_profit", 0)
-            pnl_str = _pnl_color(pnl_d)
-            pct_str = _pct_color(pnl_p)
-            dir_str = _c(d.upper(), GREEN if d == "long" else RED)
-            print(
-                f"  {pos['ticker']:<8} {dir_str:<14} {ep:>8.2f} {cur:>8.2f}"
-                f" {sh:>7.2f} {pnl_str} {pct_str}  {stop:>8.2f}  {tp:>8.2f}  {days:>4}d"
-            )
+        for pos in sorted(positions, key=lambda p: abs(p["unrealized_plpc"]), reverse=True):
+            meta   = ml_meta.get(pos["ticker"], {})
+            regime = meta.get("regime_label", "")
+            stop   = meta.get("stop_loss", 0)
+            tp     = meta.get("take_profit", 0)
+            ep_date = meta.get("entry_date", "")
+            dir_str = _c(pos["side"].upper(), GREEN if pos["side"] == "long" else RED)
+            print(f"  {pos['ticker']:<8} {dir_str:<14}"
+                  f" {pos['avg_entry_price']:>8.2f} {pos['current_price']:>8.2f}"
+                  f" {pos['qty']:>8.2f} {_pnl(pos['unrealized_pl'])} {_pct(pos['unrealized_plpc'])}"
+                  f"  {stop:>8.2f}  {tp:>8.2f}  {regime}")
     else:
         print(f"  {_c('  No open positions.', GREY)}")
 
-    # ── Recent closed trades ──────────────────────────────────────────
-    recent = [t for t in closed_trades if t.get("exit_price") is not None][-10:]
-    if recent:
-        print(f"\n  {_c('RECENT CLOSED TRADES', BOLD)}  (last {len(recent)})")
+    # ── Recent orders (closed) ─────────────────────────────────────────────
+    if orders:
+        print(f"\n  {_c('RECENT ORDERS', BOLD)}  (last {len(orders)})")
         print(f"  {'─'*(W-2)}")
-        hdr2 = (f"  {'TICKER':<8} {'DIR':<6} {'ENTRY':>8} {'EXIT':>8}"
-                f" {'P&L $':>10} {'P&L %':>8}  {'REASON':<12} {'DATE'}")
+        hdr2 = f"  {'TICKER':<8} {'SIDE':<6} {'PRICE':>8} {'QTY':>8}  {'TYPE':<16} {'DATE'}"
         print(_c(hdr2, GREY))
-        for t in reversed(recent):
-            ep, xp, sh, d = t["entry_price"], t["exit_price"], t["shares"], t["direction"]
-            pnl_d = (xp - ep)*sh if d == "long" else (ep - xp)*sh
-            pnl_p = ((xp - ep)/ep if d == "long" else (ep - xp)/ep) * 100
-            reason = t.get("exit_reason", "?")
-            xdate  = t.get("exit_date", "?")
-            dir_str = _c(d.upper(), GREEN if d == "long" else RED)
-            reason_str = _c(reason, GREEN if reason == "tp_hit" else (RED if reason == "stop_hit" else YELLOW))
-            print(
-                f"  {t['ticker']:<8} {dir_str:<14} {ep:>8.2f} {xp:>8.2f}"
-                f" {_pnl_color(pnl_d)} {_pct_color(pnl_p)}  {reason_str:<20} {xdate}"
-            )
+        for o in orders[:20]:
+            side_str = _c(o["side"].upper(), GREEN if o["side"] == "buy" else RED)
+            otype    = _c(o["type"], YELLOW if "stop" in o["type"] else GREY)
+            print(f"  {o['ticker']:<8} {side_str:<14} {o['price']:>8.2f} {o['qty']:>8.2f}"
+                  f"  {otype:<24} {o['filled_at']}")
 
     print(f"\n{_c('═'*W, CYAN)}\n")
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
-def parse_args():
-    p = argparse.ArgumentParser(description="Paper Trading Dashboard")
-    p.add_argument("--data-dir", default="data/paper_trading",
-                   help="Directory containing portfolio.json")
-    p.add_argument("--watch", action="store_true",
-                   help="Refresh every --interval seconds")
-    p.add_argument("--interval", type=int, default=60,
-                   help="Refresh interval in seconds (default 60)")
-    return p.parse_args()
-
+# ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main():
-    args = parse_args()
+    p = argparse.ArgumentParser(description="Alpaca Paper Trading Dashboard")
+    p.add_argument("--data-dir",  default="data/paper_trading")
+    p.add_argument("--watch",     action="store_true", help="Auto-refresh")
+    p.add_argument("--interval",  type=int, default=60, help="Refresh interval (s)")
+    args = p.parse_args()
     data_dir = Path(args.data_dir)
 
     if args.watch:
@@ -340,7 +259,7 @@ def main():
             while True:
                 os.system("clear")
                 render_dashboard(data_dir)
-                print(f"  {_c(f'Next refresh in {args.interval}s  (Ctrl+C to quit)', GREY)}\n")
+                print(f"  {_c(f'Refreshing every {args.interval}s  (Ctrl+C to quit)', GREY)}\n")
                 time.sleep(args.interval)
         except KeyboardInterrupt:
             print("\nBye!")

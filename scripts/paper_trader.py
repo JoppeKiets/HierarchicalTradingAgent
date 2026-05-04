@@ -1,32 +1,29 @@
 #!/usr/bin/env python3
-"""Paper Trading Engine — runs the agent on live market data every trading day.
+"""Paper Trading Engine — Alpaca paper trading backend.
 
 What this does
 --------------
-1. Fetches the latest daily OHLCV bars from Yahoo Finance (never the training cache).
-2. Builds the live feature vector on-the-fly for each ticker.
-3. Runs the full Screener → Analyst → Critic → Executor pipeline.
-4. Records NEW positions (entries) from today's orders.
-5. Marks EXISTING open positions as exited when stop-loss, take-profit,
-   or max-hold-days is hit (using today's price).
-6. Updates a JSON portfolio file and an append-only ledger.
+1. Runs the ML pipeline (Screener → Analyst → Critic → Executor).
+2. Fetches live prices from the Alpaca market data API.
+3. Submits bracket orders (built-in stop-loss + take-profit) to the Alpaca paper account.
+4. Syncs open positions and account equity back from Alpaca.
+5. Saves ML metadata (predicted return, regime, run_id, etc.) locally in JSON
+   because Alpaca doesn't know about our model signals.
 
 Files written
 -------------
-  data/paper_trading/portfolio.json       — current open positions + equity curve
-  data/paper_trading/ledger.jsonl         — every trade (entry + exit) in detail
-  data/paper_trading/daily_snapshots/     — per-day portfolio snapshot
-  data/paper_trading/price_cache/         — today's fetched prices (avoids re-fetching)
+  data/paper_trading/ml_metadata.json    — ML metadata keyed by ticker
+  data/paper_trading/equity_curve.json   — daily equity snapshots
+  data/paper_trading/ledger.jsonl        — filled/closed order records
 
 Usage
 -----
-  python scripts/paper_trader.py                          # normal daily run
-  python scripts/paper_trader.py --dry-run                # fetch prices + run pipeline, no writes
-  python scripts/paper_trader.py --force-exit-all         # close every position at market
-  python scripts/paper_trader.py --status                 # print status without running pipeline
-  python scripts/paper_trader.py --starting-capital 50000 # first-run capital (default $100k)
+  python scripts/paper_trader.py                   # normal daily run
+  python scripts/paper_trader.py --dry-run         # show orders, submit nothing
+  python scripts/paper_trader.py --status          # print Alpaca account status
+  python scripts/paper_trader.py --sync            # sync Alpaca state to local files
+  python scripts/paper_trader.py --force-exit-all  # liquidate all positions
 """
-
 from __future__ import annotations
 
 import argparse
@@ -35,304 +32,245 @@ import logging
 import os
 import sys
 import time
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, date, timedelta, timezone
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# ── make sure project root is on sys.path ──────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import yfinance as yf
-import pandas as pd
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Constants
+# Alpaca client factory
 # ---------------------------------------------------------------------------
 
-DEFAULT_CAPITAL       = 100_000.0   # Starting paper capital in USD
-MAX_HOLD_DAYS         = 10          # Force-close a position after this many days
-COMMISSION_PER_TRADE  = 0.0         # Set > 0 (e.g. 1.0) to simulate friction
-SLIPPAGE_BPS          = 5          # basis points of slippage applied at entry/exit
-
-# ---------------------------------------------------------------------------
-# Data classes
-# ---------------------------------------------------------------------------
-
-@dataclass
-class Position:
-    ticker: str
-    direction: str            # "long" | "short"
-    entry_price: float
-    entry_date: str           # ISO date string
-    shares: float             # fractional shares OK
-    stop_loss: float
-    take_profit: float
-    atr: float
-    position_size_pct: float
-    predicted_return: float
-    sub_model_agreement: float
-    regime_label: str
-    run_id: str
-    # exit fields (None while open)
-    exit_price: Optional[float] = None
-    exit_date: Optional[str] = None
-    exit_reason: Optional[str] = None   # "stop_hit" | "tp_hit" | "time_exit" | "eod_close"
-
-    @property
-    def is_open(self) -> bool:
-        return self.exit_price is None
-
-    def pnl(self, current_price: float) -> float:
-        """Unrealised P&L in dollars."""
-        if self.direction == "long":
-            return (current_price - self.entry_price) * self.shares
-        else:
-            return (self.entry_price - current_price) * self.shares
-
-    def pnl_pct(self, current_price: float) -> float:
-        if self.entry_price == 0:
-            return 0.0
-        if self.direction == "long":
-            return (current_price - self.entry_price) / self.entry_price
-        else:
-            return (self.entry_price - current_price) / self.entry_price
-
-
-@dataclass
-class Portfolio:
-    starting_capital: float = DEFAULT_CAPITAL
-    cash: float = DEFAULT_CAPITAL
-    positions: List[Position] = field(default_factory=list)
-    closed_trades: List[Position] = field(default_factory=list)
-    # Daily equity snapshots  [{"date": "...", "equity": ...}, ...]
-    equity_curve: List[Dict[str, Any]] = field(default_factory=list)
-
-    # ── Persistence ────────────────────────────────────────────────────
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "starting_capital": self.starting_capital,
-            "cash": self.cash,
-            "positions": [asdict(p) for p in self.positions],
-            "closed_trades": [asdict(p) for p in self.closed_trades],
-            "equity_curve": self.equity_curve,
-        }
-
-    @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Portfolio":
-        p = cls(
-            starting_capital=d.get("starting_capital", DEFAULT_CAPITAL),
-            cash=d.get("cash", DEFAULT_CAPITAL),
-            equity_curve=d.get("equity_curve", []),
-        )
-        p.positions = [Position(**pos) for pos in d.get("positions", [])]
-        p.closed_trades = [Position(**pos) for pos in d.get("closed_trades", [])]
-        return p
-
-    def save(self, path: Path) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(self.to_dict(), f, indent=2, default=str)
-
-    @classmethod
-    def load(cls, path: Path) -> "Portfolio":
-        if not path.exists():
-            return cls()
-        with open(path) as f:
-            return cls.from_dict(json.load(f))
-
-    # ── Metrics ────────────────────────────────────────────────────────
-
-    def total_equity(self, prices: Dict[str, float]) -> float:
-        """Cash + mark-to-market value of all open positions."""
-        equity = self.cash
-        for pos in self.positions:
-            price = prices.get(pos.ticker, pos.entry_price)
-            if pos.direction == "long":
-                equity += price * pos.shares
-            else:
-                # Short: we received entry_price * shares at entry (already in cash)
-                # net value = entry_price*shares - current*shares (already deducted at entry)
-                equity += (pos.entry_price - price) * pos.shares
-        return equity
-
-    def stats(self) -> Dict[str, Any]:
-        closed = self.closed_trades
-        if not closed:
-            return {"total_trades": 0, "win_rate": 0.0, "avg_return": 0.0,
-                    "total_pnl": 0.0, "best_trade": 0.0, "worst_trade": 0.0}
-        pnls = [(p.exit_price - p.entry_price) * p.shares
-                if p.direction == "long"
-                else (p.entry_price - p.exit_price) * p.shares
-                for p in closed if p.exit_price is not None]
-        wins = sum(1 for v in pnls if v > 0)
-        return {
-            "total_trades":  len(pnls),
-            "win_rate":      wins / len(pnls) if pnls else 0.0,
-            "avg_return":    float(np.mean(pnls)) if pnls else 0.0,
-            "total_pnl":     float(np.sum(pnls)),
-            "best_trade":    float(max(pnls)) if pnls else 0.0,
-            "worst_trade":   float(min(pnls)) if pnls else 0.0,
-            "profit_factor": (sum(v for v in pnls if v > 0) /
-                              max(1e-9, -sum(v for v in pnls if v < 0))),
-        }
+def _load_alpaca_clients():
+    from dotenv import load_dotenv
+    load_dotenv(PROJECT_ROOT / ".env")
+    api_key    = os.environ.get("ALPACA_API_KEY", "")
+    secret_key = os.environ.get("ALPACA_SECRET_KEY", "")
+    if not api_key or not secret_key:
+        raise EnvironmentError("ALPACA_API_KEY / ALPACA_SECRET_KEY not set in .env")
+    from alpaca.trading.client import TradingClient
+    from alpaca.data.historical import StockHistoricalDataClient
+    trading = TradingClient(api_key, secret_key, paper=True)
+    data    = StockHistoricalDataClient(api_key, secret_key)
+    return trading, data
 
 
 # ---------------------------------------------------------------------------
 # Price fetching
 # ---------------------------------------------------------------------------
 
-def fetch_latest_prices(tickers: List[str], cache_dir: Path) -> Dict[str, float]:
-    """
-    Fetch today's closing price for every ticker.
+def fetch_latest_prices(tickers: List[str], data_client) -> Dict[str, float]:
+    """Fetch latest mid-price for each ticker via Alpaca data API.
+    Tries latest quote (real-time mid) first; falls back to latest bar close."""
+    if not tickers:
+        return {}
+    from alpaca.data.requests import StockLatestQuoteRequest, StockLatestBarRequest
+    prices: Dict[str, float] = {}
 
-    We use a simple file cache (one JSON per day) so that multiple intra-day
-    calls don't hammer Yahoo and so the nightly systemd run always has prices
-    even if the market is closed when it runs.
-    """
-    today = date.today().isoformat()
-    cache_file = cache_dir / f"prices_{today}.json"
+    # Latest quote (real-time mid-price)
+    try:
+        req = StockLatestQuoteRequest(symbol_or_symbols=tickers)
+        quotes = data_client.get_stock_latest_quote(req)
+        for sym, q in quotes.items():
+            ask = float(getattr(q, "ask_price", 0) or 0)
+            bid = float(getattr(q, "bid_price", 0) or 0)
+            if ask > 0 and bid > 0:
+                prices[sym] = round((ask + bid) / 2.0, 4)
+            elif ask > 0:
+                prices[sym] = ask
+            elif bid > 0:
+                prices[sym] = bid
+    except Exception as e:
+        logger.warning("Quote fetch failed: %s — trying latest bar", e)
 
-    if cache_file.exists():
-        with open(cache_file) as f:
-            cached = json.load(f)
-        # Return only tickers we need; fetch missing ones
-        missing = [t for t in tickers if t not in cached]
-        if not missing:
-            logger.info("Price cache hit for %s", today)
-            return {t: cached[t] for t in tickers if t in cached}
-    else:
-        cached = {}
-        missing = list(tickers)
-
+    # Fall back to latest bar close for anything still missing
+    missing = [t for t in tickers if t not in prices]
     if missing:
-        logger.info("Fetching %d prices from Yahoo Finance…", len(missing))
         try:
-            raw = yf.download(
-                missing,
-                period="2d",       # grab 2 days so we always have at least one close
-                interval="1d",
-                progress=False,
-                auto_adjust=True,
-            )
-            if raw is not None and not raw.empty:
-                close = raw["Close"] if "Close" in raw.columns else raw
-                if isinstance(close, pd.Series):
-                    close = close.to_frame(name=missing[0])
-                for ticker in missing:
-                    if ticker in close.columns:
-                        series = close[ticker].dropna()
-                        if not series.empty:
-                            cached[ticker] = float(series.iloc[-1])
-        except Exception as exc:
-            logger.warning("Yahoo batch fetch failed: %s", exc)
-            # Fall back one by one
-            for ticker in missing:
-                try:
-                    t = yf.Ticker(ticker)
-                    hist = t.history(period="2d")
-                    if not hist.empty:
-                        cached[ticker] = float(hist["Close"].iloc[-1])
-                    time.sleep(0.1)
-                except Exception as e2:
-                    logger.warning("  Could not fetch %s: %s", ticker, e2)
+            req2 = StockLatestBarRequest(symbol_or_symbols=missing)
+            bars = data_client.get_stock_latest_bar(req2)
+            for sym, bar in bars.items():
+                prices[sym] = float(bar.close)
+        except Exception as e2:
+            logger.warning("Bar fallback failed for %d tickers: %s", len(missing), e2)
 
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        with open(cache_file, "w") as f:
-            json.dump(cached, f)
-
-    return {t: cached[t] for t in tickers if t in cached}
+    return prices
 
 
 # ---------------------------------------------------------------------------
-# Stop / TP / time-exit evaluation
+# ML metadata  (local JSON — Alpaca doesn't know our model signals)
 # ---------------------------------------------------------------------------
 
-def _slippage(price: float, direction: str, entering: bool) -> float:
-    """Apply SLIPPAGE_BPS of slippage."""
-    bps = SLIPPAGE_BPS / 10_000
-    if direction == "long":
-        return price * (1 + bps) if entering else price * (1 - bps)
+_ML_META_FILE    = "ml_metadata.json"
+_EQUITY_CURVE_FILE = "equity_curve.json"
+_LEDGER_FILE     = "ledger.jsonl"
+
+
+def load_ml_metadata(data_dir: Path) -> Dict[str, Any]:
+    path = data_dir / _ML_META_FILE
+    if not path.exists():
+        return {}
+    with open(path) as f:
+        return json.load(f)
+
+
+def save_ml_metadata(data_dir: Path, meta: Dict[str, Any]) -> None:
+    data_dir.mkdir(parents=True, exist_ok=True)
+    with open(data_dir / _ML_META_FILE, "w") as f:
+        json.dump(meta, f, indent=2, default=str)
+
+
+def load_equity_curve(data_dir: Path) -> List[Dict[str, Any]]:
+    path = data_dir / _EQUITY_CURVE_FILE
+    if not path.exists():
+        return []
+    with open(path) as f:
+        return json.load(f)
+
+
+def append_equity_snapshot(data_dir: Path, equity: float, cash: float, n_positions: int) -> None:
+    curve = load_equity_curve(data_dir)
+    today = date.today().isoformat()
+    if curve and curve[-1]["date"] == today:
+        curve[-1].update({"equity": round(equity, 2), "cash": round(cash, 2),
+                          "open_positions": n_positions})
     else:
-        return price * (1 - bps) if entering else price * (1 + bps)
+        pnl_today = round(equity - curve[-1]["equity"], 2) if curve else 0.0
+        curve.append({"date": today, "equity": round(equity, 2),
+                      "cash": round(cash, 2), "open_positions": n_positions,
+                      "pnl_today": pnl_today})
+    data_dir.mkdir(parents=True, exist_ok=True)
+    with open(data_dir / _EQUITY_CURVE_FILE, "w") as f:
+        json.dump(curve, f, indent=2)
 
 
-def check_exits(
-    positions: List[Position],
-    prices: Dict[str, float],
-    today: str,
-) -> List[Position]:
-    """
-    Evaluate all open positions against today's price.
-    Returns the same list with exit fields filled in where triggered.
-    """
-    for pos in positions:
-        if not pos.is_open:
+def append_ledger(data_dir: Path, record: Dict[str, Any]) -> None:
+    path = data_dir / _LEDGER_FILE
+    data_dir.mkdir(parents=True, exist_ok=True)
+    with open(path, "a") as f:
+        f.write(json.dumps(record, default=str) + "\n")
+
+
+# ---------------------------------------------------------------------------
+# Alpaca account / position helpers
+# ---------------------------------------------------------------------------
+
+def get_account_summary(trading_client) -> Dict[str, float]:
+    acct = trading_client.get_account()
+    return {
+        "equity":          float(acct.equity),
+        "cash":            float(acct.cash),
+        "buying_power":    float(acct.buying_power),
+        "portfolio_value": float(acct.portfolio_value),
+        "daytrade_count":  int(getattr(acct, "daytrade_count", 0)),
+    }
+
+
+def get_open_positions(trading_client) -> List[Dict[str, Any]]:
+    result = []
+    for pos in trading_client.get_all_positions():
+        result.append({
+            "ticker":          pos.symbol,
+            "qty":             float(pos.qty),
+            "side":            "long" if float(pos.qty) > 0 else "short",
+            "avg_entry_price": float(pos.avg_entry_price),
+            "current_price":   float(pos.current_price),
+            "unrealized_pl":   float(pos.unrealized_pl),
+            "unrealized_plpc": float(pos.unrealized_plpc) * 100,
+            "market_value":    float(pos.market_value),
+        })
+    return result
+
+
+def get_recent_orders(trading_client, limit: int = 50) -> List[Dict[str, Any]]:
+    from alpaca.trading.requests import GetOrdersRequest
+    from alpaca.trading.enums import QueryOrderStatus
+    orders = trading_client.get_orders(filter=GetOrdersRequest(
+        status=QueryOrderStatus.CLOSED, limit=limit
+    ))
+    result = []
+    for o in orders:
+        status_str = str(o.status).split(".")[-1].lower()
+        if status_str not in ("filled", "partially_filled"):
             continue
-        price = prices.get(pos.ticker)
-        if price is None:
+        filled_qty = float(getattr(o, "filled_qty", 0) or 0)
+        filled_avg = float(getattr(o, "filled_avg_price", 0) or 0)
+        if filled_qty == 0:
             continue
+        result.append({
+            "order_id":    str(o.id),
+            "ticker":      o.symbol,
+            "side":        str(o.side).split(".")[-1].lower(),
+            "qty":         filled_qty,
+            "filled_price": filled_avg,
+            "filled_at":   str(getattr(o, "filled_at", "")),
+            "order_type":  str(getattr(o, "order_type", "")).split(".")[-1].lower(),
+        })
+    return result
 
-        entry_date = date.fromisoformat(pos.entry_date)
-        hold_days = (date.fromisoformat(today) - entry_date).days
 
-        reason: Optional[str] = None
+# ---------------------------------------------------------------------------
+# Order submission  (bracket = SL + TP built into Alpaca)
+# ---------------------------------------------------------------------------
 
-        if pos.direction == "long":
-            if price <= pos.stop_loss:
-                reason = "stop_hit"
-                exit_px = _slippage(pos.stop_loss, "long", entering=False)
-            elif price >= pos.take_profit:
-                reason = "tp_hit"
-                exit_px = _slippage(pos.take_profit, "long", entering=False)
-            elif hold_days >= MAX_HOLD_DAYS:
-                reason = "time_exit"
-                exit_px = _slippage(price, "long", entering=False)
-            else:
-                exit_px = None
-        else:  # short
-            if price >= pos.stop_loss:
-                reason = "stop_hit"
-                exit_px = _slippage(pos.stop_loss, "short", entering=False)
-            elif price <= pos.take_profit:
-                reason = "tp_hit"
-                exit_px = _slippage(pos.take_profit, "short", entering=False)
-            elif hold_days >= MAX_HOLD_DAYS:
-                reason = "time_exit"
-                exit_px = _slippage(price, "short", entering=False)
-            else:
-                exit_px = None
+def submit_bracket_order(
+    trading_client,
+    ticker: str,
+    notional: float,
+    direction: str,
+    stop_price: float,
+    take_profit_price: float,
+    dry_run: bool = False,
+) -> Optional[Any]:
+    """Submit a market bracket order to Alpaca paper account.
 
-        if reason and exit_px is not None:
-            pos.exit_price = exit_px
-            pos.exit_date = today
-            pos.exit_reason = reason
-            logger.info(
-                "EXIT  %s %-5s  @ %.2f  (%s)  PnL $%.2f",
-                pos.direction.upper(), pos.ticker, exit_px, reason,
-                pos.pnl(exit_px),
-            )
+    Alpaca enforces:  for LONG  → stop < entry < take_profit
+                      for SHORT → take_profit < entry < stop
+    """
+    from alpaca.trading.requests import MarketOrderRequest, TakeProfitRequest, StopLossRequest
+    from alpaca.trading.enums import OrderSide, TimeInForce, OrderClass
 
-    return positions
+    side = OrderSide.BUY if direction == "long" else OrderSide.SELL
+    stop_price        = round(stop_price, 2)
+    take_profit_price = round(take_profit_price, 2)
+
+    order_req = MarketOrderRequest(
+        symbol=ticker,
+        notional=round(notional, 2),
+        side=side,
+        time_in_force=TimeInForce.DAY,
+        order_class=OrderClass.BRACKET,
+        take_profit=TakeProfitRequest(limit_price=take_profit_price),
+        stop_loss=StopLossRequest(stop_price=stop_price),
+    )
+
+    if dry_run:
+        logger.info("[DRY-RUN] %s %-6s  notional=$%.2f  stop=%.2f  tp=%.2f",
+                    direction.upper(), ticker, notional, stop_price, take_profit_price)
+        return None
+
+    try:
+        order = trading_client.submit_order(order_req)
+        logger.info("ORDER  %s %-6s  notional=$%.2f  stop=%.2f  tp=%.2f  id=%s",
+                    direction.upper(), ticker, notional, stop_price, take_profit_price, order.id)
+        return order
+    except Exception as e:
+        logger.error("Order failed for %s: %s", ticker, e)
+        return None
 
 
 # ---------------------------------------------------------------------------
 # Pipeline runner
 # ---------------------------------------------------------------------------
 
-def run_pipeline(model_path: str, top_n: int = 20, dry_run: bool = False):
-    """Run the full Screener → Analyst → Critic → Executor pipeline.
-
-    Returns a list of ExecutorOrder objects.
-    """
+def run_pipeline(model_path: str, top_n: int = 20):
     from agents.pipeline import SwingTradingPipeline
-    from agents.state import TradingState
-
     logger.info("Running pipeline with model=%s", model_path)
     pipeline = SwingTradingPipeline(
         model_path=model_path,
@@ -342,238 +280,138 @@ def run_pipeline(model_path: str, top_n: int = 20, dry_run: bool = False):
         min_predicted_return=0.001,
     )
     state = pipeline.run()
-    logger.info(
-        "Pipeline done: screened=%d approved=%d orders=%d",
-        len(state.screened_tickers),
-        len(state.approved_tickers),
-        len(state.orders),
-    )
+    logger.info("Pipeline: screened=%d  approved=%d  orders=%d",
+                len(state.screened_tickers), len(state.approved_tickers), len(state.orders))
     return state
-
-
-# ---------------------------------------------------------------------------
-# Core paper-trading loop
-# ---------------------------------------------------------------------------
-
-def paper_trade_day(
-    portfolio: Portfolio,
-    model_path: str,
-    data_dir: Path,
-    top_n: int = 20,
-    dry_run: bool = False,
-) -> Portfolio:
-    today = date.today().isoformat()
-    price_cache = data_dir / "price_cache"
-
-    # ── 1. Get all tickers we need prices for ─────────────────────────
-    open_tickers = [p.ticker for p in portfolio.positions if p.is_open]
-
-    # Run pipeline to get today's signals
-    state = run_pipeline(model_path, top_n=top_n, dry_run=dry_run)
-    new_order_tickers = [o.ticker for o in state.orders]
-
-    all_tickers = list(set(open_tickers + new_order_tickers))
-    prices = fetch_latest_prices(all_tickers, price_cache)
-
-    # ── 2. Check exits on existing open positions ─────────────────────
-    portfolio.positions = check_exits(portfolio.positions, prices, today)
-
-    # Return cash for closed positions
-    newly_closed = [p for p in portfolio.positions if p.exit_date == today]
-    for pos in newly_closed:
-        if pos.exit_price is None:
-            continue
-        if pos.direction == "long":
-            proceeds = pos.exit_price * pos.shares - COMMISSION_PER_TRADE
-        else:
-            # Short: we already deducted entry notional from cash at entry,
-            # so we get back:  entry_notional - (exit - entry)*shares
-            proceeds = pos.exit_price * pos.shares - COMMISSION_PER_TRADE
-        portfolio.cash += proceeds
-        logger.info(
-            "  Cash after closing %s: $%.2f (+$%.2f)",
-            pos.ticker, portfolio.cash, proceeds,
-        )
-
-    # Move closed positions out of open list
-    portfolio.closed_trades.extend(newly_closed)
-    portfolio.positions = [p for p in portfolio.positions if p.is_open]
-
-    # ── 3. Open new positions ─────────────────────────────────────────
-    existing_tickers = {p.ticker for p in portfolio.positions}
-
-    for order in state.orders:
-        # Skip if already holding this ticker
-        if order.ticker in existing_tickers:
-            logger.info("SKIP  %s — already in portfolio", order.ticker)
-            continue
-        price = prices.get(order.ticker)
-        if price is None:
-            logger.warning("SKIP  %s — no live price available", order.ticker)
-            continue
-        if price < 2.0:
-            logger.info("SKIP  %s — price $%.2f below $2 floor", order.ticker, price)
-            continue
-
-        # How much capital to allocate?
-        notional = portfolio.cash * order.position_size_pct
-        if notional < 10.0:
-            logger.info("SKIP  %s — insufficient cash (need $%.2f)", order.ticker, notional)
-            continue
-        if notional > portfolio.cash:
-            notional = portfolio.cash * 0.9   # safety cap
-
-        entry_px = _slippage(price, order.direction, entering=True)
-        shares = notional / entry_px
-
-        # Find the matching analyst report for meta-data
-        report_map = {r.ticker: r for r in state.analyst_reports}
-        report = report_map.get(order.ticker)
-
-        raw_stop = order.stop_loss or (entry_px * 0.95 if order.direction == "long" else entry_px * 1.05)
-        raw_tp   = order.take_profit or (entry_px * 1.10 if order.direction == "long" else entry_px * 0.90)
-
-        # Sanity-check: stop must be on the correct side of entry, otherwise
-        # recalculate using ATR or a fixed 5% fallback (stale price in CSV).
-        if order.direction == "long" and raw_stop >= entry_px:
-            logger.warning(
-                "ADJUST %s: stop $%.2f >= entry $%.2f (stale data?) → recalculating",
-                order.ticker, raw_stop, entry_px,
-            )
-            atr = order.atr or entry_px * 0.05
-            raw_stop = entry_px - 2.0 * atr
-            raw_tp   = entry_px + 3.0 * atr
-        elif order.direction == "short" and raw_stop <= entry_px:
-            logger.warning(
-                "ADJUST %s: stop $%.2f <= entry $%.2f (stale data?) → recalculating",
-                order.ticker, raw_stop, entry_px,
-            )
-            atr = order.atr or entry_px * 0.05
-            raw_stop = entry_px + 2.0 * atr
-            raw_tp   = entry_px - 3.0 * atr
-
-        stop = raw_stop
-        tp   = raw_tp
-
-        pos = Position(
-            ticker=order.ticker,
-            direction=order.direction,
-            entry_price=entry_px,
-            entry_date=today,
-            shares=shares,
-            stop_loss=stop,
-            take_profit=tp,
-            atr=order.atr or 0.0,
-            position_size_pct=order.position_size_pct,
-            predicted_return=report.predicted_return if report else 0.0,
-            sub_model_agreement=report.sub_model_agreement if report else 0.0,
-            regime_label=order.regime_label or state.regime_label,
-            run_id=state.run_id,
-        )
-
-        if not dry_run:
-            # Deduct cost for longs; for shorts we receive proceeds
-            if order.direction == "long":
-                portfolio.cash -= entry_px * shares + COMMISSION_PER_TRADE
-            else:
-                portfolio.cash += entry_px * shares - COMMISSION_PER_TRADE
-            portfolio.positions.append(pos)
-
-        logger.info(
-            "ENTER %s %-5s  @ $%.2f  shares=%.2f  stop=%.2f  tp=%.2f  size=%.1f%%",
-            order.direction.upper(), order.ticker, entry_px, shares,
-            stop, tp, order.position_size_pct * 100,
-        )
-
-    # ── 4. Snapshot equity ────────────────────────────────────────────
-    equity = portfolio.total_equity(prices)
-    snapshot = {
-        "date": today,
-        "equity": round(equity, 2),
-        "cash": round(portfolio.cash, 2),
-        "open_positions": len(portfolio.positions),
-        "pnl_today": round(
-            equity - (portfolio.equity_curve[-1]["equity"] if portfolio.equity_curve else portfolio.starting_capital),
-            2,
-        ),
-    }
-    portfolio.equity_curve.append(snapshot)
-
-    logger.info(
-        "Portfolio | equity=$%.2f  cash=$%.2f  open=%d  total_return=%.2f%%",
-        equity, portfolio.cash,
-        len(portfolio.positions),
-        (equity / portfolio.starting_capital - 1) * 100,
-    )
-    return portfolio
-
-
-# ---------------------------------------------------------------------------
-# Ledger writer
-# ---------------------------------------------------------------------------
-
-def append_ledger(portfolio: Portfolio, ledger_path: Path) -> None:
-    """Append all closed trades from today to the ledger JSONL."""
-    today = date.today().isoformat()
-    ledger_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(ledger_path, "a") as f:
-        for pos in portfolio.closed_trades:
-            if pos.exit_date == today:
-                f.write(json.dumps(asdict(pos), default=str) + "\n")
-
-
-def save_daily_snapshot(portfolio: Portfolio, snapshots_dir: Path) -> None:
-    today = date.today().isoformat()
-    snapshots_dir.mkdir(parents=True, exist_ok=True)
-    snap_path = snapshots_dir / f"snapshot_{today}.json"
-    with open(snap_path, "w") as f:
-        json.dump(portfolio.to_dict(), f, indent=2, default=str)
 
 
 # ---------------------------------------------------------------------------
 # Status printer
 # ---------------------------------------------------------------------------
 
-def print_status(portfolio: Portfolio, prices: Optional[Dict[str, float]] = None) -> None:
-    prices = prices or {}
-    equity = portfolio.total_equity(prices)
-    total_return = (equity / portfolio.starting_capital - 1) * 100
-    stats = portfolio.stats()
+def print_status(trading_client, ml_meta: Dict[str, Any]) -> None:
+    acct      = get_account_summary(trading_client)
+    positions = get_open_positions(trading_client)
+    starting  = float(ml_meta.get("_starting_capital", acct["equity"]))
+    total_ret = (acct["equity"] / starting - 1) * 100 if starting else 0.0
+    sign = "+" if total_ret >= 0 else ""
 
     print(f"\n{'═'*72}")
-    print(f"  PAPER TRADING STATUS  —  {date.today().isoformat()}")
+    print(f"  ALPACA PAPER TRADING STATUS  —  {date.today().isoformat()}")
     print(f"{'═'*72}")
-    print(f"  Starting capital : ${portfolio.starting_capital:>12,.2f}")
-    print(f"  Current equity   : ${equity:>12,.2f}   ({total_return:+.2f}%)")
-    print(f"  Cash available   : ${portfolio.cash:>12,.2f}")
-    print(f"  Open positions   : {len(portfolio.positions)}")
-    print(f"  Closed trades    : {stats['total_trades']}")
-    print(f"  Win rate         : {stats['win_rate']*100:.1f}%")
-    print(f"  Avg trade P&L    : ${stats['avg_return']:+.2f}")
-    print(f"  Total realized   : ${stats['total_pnl']:+,.2f}")
-    print(f"  Profit factor    : {stats.get('profit_factor', 0):.2f}")
+    print(f"  Equity           : ${acct['equity']:>12,.2f}   ({sign}{total_ret:.2f}%)")
+    print(f"  Cash             : ${acct['cash']:>12,.2f}")
+    print(f"  Buying power     : ${acct['buying_power']:>12,.2f}")
+    print(f"  Open positions   : {len(positions)}")
 
-    if portfolio.positions:
+    if positions:
         print(f"\n  {'─'*68}")
-        print(f"  {'TICKER':<8} {'DIR':<6} {'ENTRY':>8} {'NOW':>8} {'SHARES':>7} {'PnL $':>9} {'PnL %':>7} {'REGIME':<12}")
+        print(f"  {'TICKER':<8} {'SIDE':<6} {'ENTRY':>8} {'NOW':>8} {'QTY':>8} {'UNRL P&L':>10} {'%':>8}  REGIME")
         print(f"  {'─'*68}")
-        for pos in portfolio.positions:
-            cur = prices.get(pos.ticker, pos.entry_price)
-            pnl_d = pos.pnl(cur)
-            pnl_p = pos.pnl_pct(cur) * 100
-            print(
-                f"  {pos.ticker:<8} {pos.direction.upper():<6} {pos.entry_price:>8.2f}"
-                f" {cur:>8.2f} {pos.shares:>7.2f}"
-                f" {pnl_d:>+9.2f} {pnl_p:>+6.1f}%  {pos.regime_label:<12}"
-            )
-
-    if portfolio.equity_curve:
-        print(f"\n  Recent equity curve (last 5 days):")
-        for snap in portfolio.equity_curve[-5:]:
-            daily = snap.get("pnl_today", 0)
-            print(f"    {snap['date']}  equity=${snap['equity']:>10,.2f}  daily={daily:>+8.2f}  positions={snap.get('open_positions',0)}")
+        for pos in positions:
+            meta   = ml_meta.get(pos["ticker"], {})
+            regime = meta.get("regime_label", "")
+            sign_p = "+" if pos["unrealized_pl"] >= 0 else ""
+            sign_r = "+" if pos["unrealized_plpc"] >= 0 else ""
+            print(f"  {pos['ticker']:<8} {pos['side'].upper():<6}"
+                  f" {pos['avg_entry_price']:>8.2f} {pos['current_price']:>8.2f}"
+                  f" {pos['qty']:>8.2f} {sign_p}{pos['unrealized_pl']:>9.2f}"
+                  f" {sign_r}{pos['unrealized_plpc']:>7.2f}%  {regime}")
 
     print(f"{'═'*72}\n")
+
+
+# ---------------------------------------------------------------------------
+# Core daily run
+# ---------------------------------------------------------------------------
+
+def paper_trade_day(
+    trading_client,
+    data_client,
+    data_dir: Path,
+    model_path: str,
+    top_n: int = 20,
+    dry_run: bool = False,
+) -> None:
+    ml_meta = load_ml_metadata(data_dir)
+
+    # ── 1. Run ML pipeline ─────────────────────────────────────────────
+    state = run_pipeline(model_path, top_n=top_n)
+
+    # ── 2. Current Alpaca state ────────────────────────────────────────
+    acct  = get_account_summary(trading_client)
+    held  = {p["ticker"] for p in get_open_positions(trading_client)}
+
+    # ── 3. Fetch prices for new candidates ────────────────────────────
+    new_tickers = [o.ticker for o in state.orders if o.ticker not in held]
+    prices = fetch_latest_prices(new_tickers, data_client) if new_tickers else {}
+
+    # ── 4. Submit bracket orders for new signals ───────────────────────
+    report_map = {r.ticker: r for r in state.analyst_reports}
+
+    for order in state.orders:
+        if order.ticker in held:
+            logger.info("SKIP  %s — already held in Alpaca", order.ticker)
+            continue
+
+        price = prices.get(order.ticker)
+        if not price or price < 2.0:
+            logger.warning("SKIP  %s — no price (%.2f)", order.ticker, price or 0)
+            continue
+
+        notional = acct["buying_power"] * order.position_size_pct
+        if notional < 10.0:
+            logger.info("SKIP  %s — notional $%.2f too small", order.ticker, notional)
+            continue
+
+        atr = order.atr or price * 0.03
+        if order.direction == "long":
+            raw_stop = order.stop_loss   or (price - 2.0 * atr)
+            raw_tp   = order.take_profit or (price + 3.0 * atr)
+            if raw_stop >= price:
+                raw_stop = price * 0.95
+            if raw_tp <= price:
+                raw_tp = price * 1.10
+        else:
+            raw_stop = order.stop_loss   or (price + 2.0 * atr)
+            raw_tp   = order.take_profit or (price - 3.0 * atr)
+            if raw_stop <= price:
+                raw_stop = price * 1.05
+            if raw_tp >= price:
+                raw_tp = price * 0.90
+
+        submitted = submit_bracket_order(
+            trading_client, order.ticker, notional,
+            order.direction, raw_stop, raw_tp, dry_run=dry_run,
+        )
+
+        if submitted or dry_run:
+            report = report_map.get(order.ticker)
+            ml_meta[order.ticker] = {
+                "direction":           order.direction,
+                "predicted_return":    report.predicted_return if report else 0.0,
+                "sub_model_agreement": report.sub_model_agreement if report else 0.0,
+                "regime_label":        order.regime_label or getattr(state, "regime_label", ""),
+                "run_id":              getattr(state, "run_id", ""),
+                "entry_date":          date.today().isoformat(),
+                "stop_loss":           raw_stop,
+                "take_profit":         raw_tp,
+                "notional":            notional,
+                "alpaca_order_id":     str(submitted.id) if submitted else "dry-run",
+            }
+
+    # ── 5. Record equity snapshot ──────────────────────────────────────
+    acct_now = get_account_summary(trading_client)
+    if "_starting_capital" not in ml_meta:
+        ml_meta["_starting_capital"] = acct_now["equity"]
+
+    if not dry_run:
+        n_pos = len(get_open_positions(trading_client))
+        save_ml_metadata(data_dir, ml_meta)
+        append_equity_snapshot(data_dir, acct_now["equity"], acct_now["cash"], n_pos)
+
+    logger.info("Done | equity=$%.2f  cash=$%.2f  buying_power=$%.2f",
+                acct_now["equity"], acct_now["cash"], acct_now["buying_power"])
 
 
 # ---------------------------------------------------------------------------
@@ -588,130 +426,69 @@ def find_latest_model() -> str:
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Paper Trading Engine")
-    p.add_argument("--model", default=None, help="Path to forecaster_final.pt")
-    p.add_argument("--top-n", type=int, default=20, help="Screener top-N")
-    p.add_argument("--data-dir", default="data/paper_trading",
-                   help="Directory for portfolio.json and ledger.jsonl")
-    p.add_argument("--starting-capital", type=float, default=DEFAULT_CAPITAL,
-                   help="Starting capital for a fresh portfolio (default $100k)")
+    p = argparse.ArgumentParser(description="Paper Trading Engine (Alpaca)")
+    p.add_argument("--model",   default=None, help="Path to forecaster_final.pt")
+    p.add_argument("--top-n",   type=int, default=20)
+    p.add_argument("--data-dir", default="data/paper_trading")
     p.add_argument("--dry-run", action="store_true",
-                   help="Run pipeline and show what would happen, write nothing")
-    p.add_argument("--check-only", action="store_true",
-                   help="Only evaluate stop/TP exits on open positions — skip the full pipeline. "
-                        "Fast enough to run every 15 minutes during market hours.")
+                   help="Run pipeline, print orders, submit nothing to Alpaca")
+    p.add_argument("--status",  action="store_true",
+                   help="Print Alpaca account status and exit")
+    p.add_argument("--sync",    action="store_true",
+                   help="Sync Alpaca account state to local equity_curve.json")
     p.add_argument("--force-exit-all", action="store_true",
-                   help="Close every open position at today's market price")
-    p.add_argument("--status", action="store_true",
-                   help="Print portfolio status and exit (no pipeline run)")
+                   help="Liquidate all Alpaca positions immediately")
     p.add_argument("-v", "--verbose", action="store_true")
     return p.parse_args()
 
 
 def main():
     args = parse_args()
-    level = logging.DEBUG if args.verbose else logging.INFO
-    fmt = "%(asctime)s [%(levelname)s] %(message)s"
-    logging.basicConfig(level=level, format=fmt, datefmt="%Y-%m-%d %H:%M:%S")
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
+    trading_client, data_client = _load_alpaca_clients()
     data_dir = Path(args.data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
-    portfolio_path = data_dir / "portfolio.json"
-    ledger_path    = data_dir / "ledger.jsonl"
-    snapshots_dir  = data_dir / "daily_snapshots"
+    ml_meta = load_ml_metadata(data_dir)
 
-    # Load or initialise portfolio
-    if portfolio_path.exists():
-        portfolio = Portfolio.load(portfolio_path)
-        logger.info("Loaded portfolio: equity≈$%.0f  open=%d  closed=%d",
-                    portfolio.cash, len(portfolio.positions), len(portfolio.closed_trades))
-    else:
-        portfolio = Portfolio(
-            starting_capital=args.starting_capital,
-            cash=args.starting_capital,
-        )
-        logger.info("New portfolio created with $%.0f starting capital", args.starting_capital)
-
-    # ── --status: just print and exit ─────────────────────────────────
     if args.status:
-        all_tickers = [p.ticker for p in portfolio.positions]
-        prices = fetch_latest_prices(all_tickers, data_dir / "price_cache") if all_tickers else {}
-        print_status(portfolio, prices)
+        print_status(trading_client, ml_meta)
         return
 
-    # ── --force-exit-all ──────────────────────────────────────────────
+    if args.sync:
+        acct  = get_account_summary(trading_client)
+        n_pos = len(get_open_positions(trading_client))
+        append_equity_snapshot(data_dir, acct["equity"], acct["cash"], n_pos)
+        save_ml_metadata(data_dir, ml_meta)
+        logger.info("Synced: equity=$%.2f  positions=%d", acct["equity"], n_pos)
+        print_status(trading_client, ml_meta)
+        return
+
     if args.force_exit_all:
-        tickers = [p.ticker for p in portfolio.positions if p.is_open]
-        prices = fetch_latest_prices(tickers, data_dir / "price_cache")
-        today = date.today().isoformat()
-        for pos in portfolio.positions:
-            if pos.is_open and pos.ticker in prices:
-                px = _slippage(prices[pos.ticker], pos.direction, entering=False)
-                pos.exit_price = px
-                pos.exit_date = today
-                pos.exit_reason = "eod_close"
-                logger.info("FORCE-CLOSE %s @ $%.2f", pos.ticker, px)
-                if pos.direction == "long":
-                    portfolio.cash += px * pos.shares
-                else:
-                    portfolio.cash += (pos.entry_price - px) * pos.shares
-        portfolio.closed_trades.extend([p for p in portfolio.positions if not p.is_open])
-        portfolio.positions = [p for p in portfolio.positions if p.is_open]
         if not args.dry_run:
-            portfolio.save(portfolio_path)
-            append_ledger(portfolio, ledger_path)
-        print_status(portfolio, prices)
-        return
-
-    # ── --check-only: evaluate exits without running the pipeline ──────
-    if args.check_only:
-        open_tickers = [p.ticker for p in portfolio.positions if p.is_open]
-        if not open_tickers:
-            logger.info("check-only: no open positions, nothing to do")
-            return
-        prices = fetch_latest_prices(open_tickers, data_dir / "price_cache")
-        today = date.today().isoformat()
-        portfolio.positions = check_exits(portfolio.positions, prices, today)
-        newly_closed = [p for p in portfolio.positions if p.exit_date == today]
-        for pos in newly_closed:
-            if pos.exit_price is None:
-                continue
-            if pos.direction == "long":
-                portfolio.cash += pos.exit_price * pos.shares - COMMISSION_PER_TRADE
-            else:
-                portfolio.cash += pos.exit_price * pos.shares - COMMISSION_PER_TRADE
-        portfolio.closed_trades.extend(newly_closed)
-        portfolio.positions = [p for p in portfolio.positions if p.is_open]
-        if newly_closed and not args.dry_run:
-            portfolio.save(portfolio_path)
-            append_ledger(portfolio, ledger_path)
-            logger.info("check-only: closed %d position(s), portfolio saved", len(newly_closed))
+            logger.info("Liquidating all Alpaca positions…")
+            trading_client.close_all_positions(cancel_orders=True)
+            logger.info("Done — all positions closed.")
         else:
-            logger.info("check-only: %d position(s) checked, none triggered", len(open_tickers))
+            logger.info("[DRY-RUN] Would call close_all_positions(cancel_orders=True)")
+        print_status(trading_client, ml_meta)
         return
 
-    # ── Normal daily run ──────────────────────────────────────────────
     model_path = args.model or find_latest_model()
     logger.info("Model: %s", model_path)
-
-    portfolio = paper_trade_day(
-        portfolio=portfolio,
-        model_path=model_path,
+    paper_trade_day(
+        trading_client=trading_client,
+        data_client=data_client,
         data_dir=data_dir,
+        model_path=model_path,
         top_n=args.top_n,
         dry_run=args.dry_run,
     )
-
-    if not args.dry_run:
-        portfolio.save(portfolio_path)
-        append_ledger(portfolio, ledger_path)
-        save_daily_snapshot(portfolio, snapshots_dir)
-        logger.info("Portfolio saved to %s", portfolio_path)
-
-    # Always print status at the end
-    all_tickers = [p.ticker for p in portfolio.positions]
-    prices = fetch_latest_prices(all_tickers, data_dir / "price_cache") if all_tickers else {}
-    print_status(portfolio, prices)
+    print_status(trading_client, ml_meta)
 
 
 if __name__ == "__main__":
