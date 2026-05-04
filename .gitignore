@@ -40,3 +40,11 @@ Thumbs.db
 
 # Documentation
 docs/
+
+# Model checkpoint binaries in results (too large for GitHub; use DVC or manual upload)
+results/**/*.pt
+results/**/*.pt
+
+# Local docs (not tracked in repo)
+WORKING_DOC.md
+IMPLEMENTATION_COMPLETE.md
