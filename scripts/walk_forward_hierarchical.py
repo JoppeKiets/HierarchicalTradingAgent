@@ -743,17 +743,47 @@ def collect_sub_model_predictions(
 # Long-short backtest (same as evaluate_hierarchical.py)
 # ============================================================================
 
-def backtest_long_short(preds, targets, dates, top_k=20):
+def backtest_long_short(preds, targets, dates, top_k=20,
+                        commission_bps: float = 5.0, slippage_bps: float = 5.0):
+    """Long-short backtest with optional transaction-cost deduction.
+
+    Args:
+        commission_bps: One-way commission in basis points (default 5 bps).
+        slippage_bps:   One-way slippage in basis points (default 5 bps).
+        Costs are applied as: daily_net_return = gross_return - turnover * (commission + slippage) / 10_000
+        where turnover = fraction of the portfolio that changed vs. the previous day.
+    """
     unique_dates = sorted(set(dates))
     daily_returns = []
+    turnovers = []
+    prev_longs: set = set()
+    prev_shorts: set = set()
+
     for d in unique_dates:
-        mask = dates == d
+        mask = np.where(dates == d)[0]
         dp, dt = preds[mask], targets[mask]
         k = min(top_k, max(1, len(dp) // 4))
         rank = np.argsort(dp)
+        long_idx  = set(mask[rank[-k:]])
+        short_idx = set(mask[rank[:k]])
+
         lr = np.mean(dt[rank[-k:]])
         sr = np.mean(dt[rank[:k]])
-        daily_returns.append((lr - sr) / 2.0)
+        gross = (lr - sr) / 2.0
+
+        # Turnover: fraction of slots that changed relative to previous day
+        if prev_longs or prev_shorts:
+            changed = len((long_idx - prev_longs) | (short_idx - prev_shorts))
+            total_slots = max(len(long_idx) + len(short_idx), 1)
+            turnover = changed / total_slots
+        else:
+            turnover = 1.0  # first day: full entry cost
+        turnovers.append(turnover)
+
+        cost = turnover * (commission_bps + slippage_bps) / 10_000
+        daily_returns.append(gross - cost)
+
+        prev_longs, prev_shorts = long_idx, short_idx
 
     dr = np.array(daily_returns)
     if len(dr) < 5:
@@ -765,8 +795,11 @@ def backtest_long_short(preds, targets, dates, top_k=20):
     sharpe = ann_ret / ann_vol if ann_vol > 1e-10 else 0.0
     peak = np.maximum.accumulate(cum)
     max_dd = float(np.min((cum - peak) / peak))
+    avg_turnover = float(np.mean(turnovers))
     return {"sharpe": round(sharpe, 4), "max_drawdown": round(max_dd, 4),
-            "total_return": round(total, 4), "n_days": len(dr)}
+            "total_return": round(total, 4), "n_days": len(dr),
+            "avg_daily_turnover": round(avg_turnover, 4),
+            "commission_bps": commission_bps, "slippage_bps": slippage_bps}
 
 
 # ============================================================================
@@ -871,6 +904,9 @@ def run_walk_forward(
     expanding_window: bool = True,
     purge_horizon: int = 0,
     skip_models: List[str] = None,
+    resume_from_fold: int = -1,
+    commission_bps: float = 5.0,
+    slippage_bps: float = 5.0,
 ):
     if phases is None:
         phases = [1, 2, 3]
@@ -999,6 +1035,17 @@ def run_walk_forward(
         logger.info(f"\n{'#'*70}")
         logger.info(f"# WINDOW {w_idx}/{n_windows}")
         logger.info(f"{'#'*70}")
+
+        # TASK-013: resume — reload saved predictions and skip retraining
+        if resume_from_fold >= 0 and w_idx < resume_from_fold:
+            preds_path = os.path.join(output_dir, f"window_{w_idx}", f"fold_{w_idx}_preds.npz")
+            if os.path.exists(preds_path):
+                saved = np.load(preds_path, allow_pickle=True)
+                all_window_results.append(saved["window_result"].item())
+                logger.info(f"  Skipped (resume): loaded saved results from {preds_path}")
+                continue
+            else:
+                logger.warning(f"  resume_from_fold={resume_from_fold} but no saved preds at {preds_path}; training fold {w_idx}")
 
         t0 = time.time()
 
@@ -1201,7 +1248,8 @@ def run_walk_forward(
             if _mask.sum() > 1:
                 preds_cs[_mask] = _zscore(preds[_mask])
 
-        ls = backtest_long_short(preds_cs, raw_targets, dates, top_k=top_k)  # raw_targets = clipped returns → correct for P&L
+        ls = backtest_long_short(preds_cs, raw_targets, dates, top_k=top_k,
+                                   commission_bps=commission_bps, slippage_bps=slippage_bps)  # raw_targets = clipped returns → correct for P&L
 
         elapsed = time.time() - t0
 
@@ -1221,8 +1269,15 @@ def run_walk_forward(
         logger.info(f"    Val IC={val_ic:.4f} (for ensemble weighting)")
         logger.info(f"    Test IC={metrics['ic']:.4f}, RankIC={metrics['rank_ic']:.4f}, "
                     f"DirAcc={metrics['directional_accuracy']:.3f}")
-        logger.info(f"    L/S Sharpe={ls['sharpe']:.4f}, MaxDD={ls.get('max_drawdown', 0):.4f}")
+        logger.info(f"    L/S Sharpe={ls['sharpe']:.4f}, MaxDD={ls.get('max_drawdown', 0):.4f}, "
+                    f"AvgTurnover={ls.get('avg_daily_turnover', 0):.3f} "
+                    f"(cost={commission_bps:.0f}+{slippage_bps:.0f} bps)")
         logger.info(f"    Time: {elapsed:.0f}s")
+
+        # TASK-013: save fold predictions for --resume-from-fold
+        preds_save_path = os.path.join(tcfg.output_dir, f"fold_{w_idx}_preds.npz")
+        np.savez(preds_save_path, window_result=np.array(window_result, dtype=object))
+        logger.info(f"  Saved fold preds: {preds_save_path}")
 
         # Save fold checkpoint with fold index
         fold_checkpoint_path = os.path.join(tcfg.output_dir, f"fold_{w_idx}_forecaster.pt")
@@ -1363,6 +1418,14 @@ def main():
     parser.add_argument("--skip-models", type=str, nargs="+", default=[],
                         metavar="MODEL",
                         help="Sub-models to disable, e.g. --skip-models lstm_m tft_m news")
+    # TASK-013: fold resume
+    parser.add_argument("--resume-from-fold", type=int, default=-1,
+                        help="Skip folds 0..N-1 (load saved preds) and train from fold N onwards")
+    # TASK-014: transaction costs
+    parser.add_argument("--commission-bps", type=float, default=5.0,
+                        help="One-way commission in basis points (default 5)")
+    parser.add_argument("--slippage-bps", type=float, default=5.0,
+                        help="One-way slippage in basis points (default 5)")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -1388,6 +1451,9 @@ def main():
         expanding_window=not args.rolling,
         purge_horizon=args.purge_horizon,
         skip_models=args.skip_models,
+        resume_from_fold=args.resume_from_fold,
+        commission_bps=args.commission_bps,
+        slippage_bps=args.slippage_bps,
     )
 
 
