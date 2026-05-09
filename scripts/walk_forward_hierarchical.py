@@ -549,8 +549,8 @@ def collect_test_predictions(
     daily_loader, minute_loader,
     data_cfg: HierarchicalDataConfig,
     device: torch.device,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Run the full model and return (preds, targets, dates)."""
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Run the full model and return (preds, z_targets, raw_targets, dates, tickers)."""
     forecaster.eval()
     E = forecaster.cfg.embedding_dim
     R = forecaster.cfg.regime_dim
@@ -615,7 +615,7 @@ def collect_test_predictions(
 
     zero_emb = torch.zeros(E)
     aligned_preds, aligned_embs, aligned_regimes = [], [], []
-    aligned_tgts, aligned_raw_tgts, aligned_dates = [], [], []
+    aligned_tgts, aligned_raw_tgts, aligned_dates, aligned_tickers = [], [], [], []
 
     # Build prediction and embedding vectors according to forecaster's sub_model_names
     for key, dd in daily_data.items():
@@ -649,9 +649,10 @@ def collect_test_predictions(
         aligned_tgts.append(dd["target"].item())
         aligned_raw_tgts.append(dd.get("raw_target", dd["target"]).item())
         aligned_dates.append(ord_date)
+        aligned_tickers.append(key[0])  # ticker symbol
 
     if not aligned_preds:
-        return np.array([]), np.array([]), np.array([]), np.array([])
+        return np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
 
     # Batched meta inference
     all_pred_t = torch.stack(aligned_preds)
@@ -675,6 +676,7 @@ def collect_test_predictions(
         np.array(aligned_tgts),        # z-scored targets (for IC)
         np.array(aligned_raw_tgts),    # raw returns (for P&L backtest)
         np.array(aligned_dates),
+        np.array(aligned_tickers),     # ticker symbols (for turnover tracking)
     )
 
 
@@ -744,7 +746,8 @@ def collect_sub_model_predictions(
 # ============================================================================
 
 def backtest_long_short(preds, targets, dates, top_k=20,
-                        commission_bps: float = 5.0, slippage_bps: float = 5.0):
+                        commission_bps: float = 5.0, slippage_bps: float = 5.0,
+                        tickers=None):
     """Long-short backtest with optional transaction-cost deduction.
 
     Args:
@@ -764,8 +767,15 @@ def backtest_long_short(preds, targets, dates, top_k=20,
         dp, dt = preds[mask], targets[mask]
         k = min(top_k, max(1, len(dp) // 4))
         rank = np.argsort(dp)
-        long_idx  = set(mask[rank[-k:]])
-        short_idx = set(mask[rank[:k]])
+        # Use ticker symbols for position identity if available, else fall back
+        # to array indices (legacy — always gives turnover≈1.0, a known bug)
+        if tickers is not None:
+            tickers_day = tickers[mask]
+            long_ids  = set(tickers_day[rank[-k:]])
+            short_ids = set(tickers_day[rank[:k]])
+        else:
+            long_ids  = set(mask[rank[-k:]])
+            short_ids = set(mask[rank[:k]])
 
         lr = np.mean(dt[rank[-k:]])
         sr = np.mean(dt[rank[:k]])
@@ -773,8 +783,8 @@ def backtest_long_short(preds, targets, dates, top_k=20,
 
         # Turnover: fraction of slots that changed relative to previous day
         if prev_longs or prev_shorts:
-            changed = len((long_idx - prev_longs) | (short_idx - prev_shorts))
-            total_slots = max(len(long_idx) + len(short_idx), 1)
+            changed = len((long_ids - prev_longs) | (short_ids - prev_shorts))
+            total_slots = max(len(long_ids) + len(short_ids), 1)
             turnover = changed / total_slots
         else:
             turnover = 1.0  # first day: full entry cost
@@ -783,7 +793,7 @@ def backtest_long_short(preds, targets, dates, top_k=20,
         cost = turnover * (commission_bps + slippage_bps) / 10_000
         daily_returns.append(gross - cost)
 
-        prev_longs, prev_shorts = long_idx, short_idx
+        prev_longs, prev_shorts = long_ids, short_ids
 
     dr = np.array(daily_returns)
     if len(dr) < 5:
@@ -1218,7 +1228,7 @@ def run_walk_forward(
         logger.info(f"\n  Evaluating on validation set for IC weighting...")
         # Ensure forecaster is on device before inference
         forecaster = forecaster.to(device)
-        val_preds, val_targets, _, val_dates = collect_test_predictions(
+        val_preds, val_targets, _, val_dates, _ = collect_test_predictions(
             forecaster, loaders["daily"]["val"], loaders["minute"]["val"],
             data_cfg, device,
         )
@@ -1229,7 +1239,7 @@ def run_walk_forward(
         logger.info(f"\n  Evaluating on test window...")
         # Ensure forecaster is on device before inference
         forecaster = forecaster.to(device)
-        preds, targets, raw_targets, dates = collect_test_predictions(
+        preds, targets, raw_targets, dates, tickers_arr = collect_test_predictions(
             forecaster, loaders["daily"]["test"], loaders["minute"]["test"],
             data_cfg, device,
         )
@@ -1249,7 +1259,8 @@ def run_walk_forward(
                 preds_cs[_mask] = _zscore(preds[_mask])
 
         ls = backtest_long_short(preds_cs, raw_targets, dates, top_k=top_k,
-                                   commission_bps=commission_bps, slippage_bps=slippage_bps)  # raw_targets = clipped returns → correct for P&L
+                                   commission_bps=commission_bps, slippage_bps=slippage_bps,
+                                   tickers=tickers_arr)  # raw_targets = clipped returns -> correct for P&L
 
         elapsed = time.time() - t0
 
