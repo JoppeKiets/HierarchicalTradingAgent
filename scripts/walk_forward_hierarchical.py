@@ -110,7 +110,12 @@ class WindowDailyDataset(LazyDailyDataset):
 
 
 class WindowMinuteDataset(LazyMinuteDataset):
-    """LazyMinuteDataset restricted to a specific ordinal date range."""
+    """LazyMinuteDataset restricted to a specific ordinal date range.
+
+    Stores the index as two compact numpy arrays (ticker bytes + int32 row
+    numbers) rather than a Python list of (str, int) tuples.  With 87M
+    entries the list approach uses ~8.8 GB; the array approach uses ~1 GB.
+    """
 
     def __init__(
         self,
@@ -122,24 +127,27 @@ class WindowMinuteDataset(LazyMinuteDataset):
         self.cfg = cfg
         self.cache = Path(cfg.cache_dir) / "minute"
         self.split_name = "custom"
-        self.index = []
         self.n_features = 0
+
+        # Compact storage: parallel arrays instead of list-of-tuples
+        _tickers_list: List[np.ndarray] = []
+        _rows_list: List[np.ndarray] = []
 
         for ticker in tickers:
             feat_path = self.cache / f"{ticker}_features.npy"
-            tgt_path = self.cache / f"{ticker}_targets.npy"
+            tgt_path  = self.cache / f"{ticker}_targets.npy"
             date_path = self.cache / f"{ticker}_dates.npy"
             if not feat_path.exists() or not tgt_path.exists() or not date_path.exists():
                 continue
 
             dates = np.load(date_path, mmap_mode="r")
-            tgt = np.load(tgt_path, mmap_mode="r")
-            feat = np.load(feat_path, mmap_mode="r")
+            tgt   = np.load(tgt_path,  mmap_mode="r")
+            feat  = np.load(feat_path, mmap_mode="r")
             n_rows, n_feat = feat.shape
             self.n_features = n_feat
 
-            # Vectorised index build — avoids Python-level row-by-row loop
-            idx = np.arange(cfg.minute_seq_len, n_rows, cfg.minute_stride)
+            # Vectorised index build
+            idx = np.arange(cfg.minute_seq_len, n_rows, cfg.minute_stride, dtype=np.int32)
             if len(idx) == 0:
                 continue
             prev_idx = idx - 1
@@ -148,7 +156,52 @@ class WindowMinuteDataset(LazyMinuteDataset):
                 (dates[prev_idx] >= date_lo) &
                 (dates[prev_idx] < date_hi)
             )
-            self.index.extend((ticker, int(i)) for i in idx[valid])
+            valid_idx = idx[valid]
+            if len(valid_idx) == 0:
+                continue
+            # Encode ticker as fixed-width bytes (max 16 chars covers all tickers)
+            _tickers_list.append(
+                np.full(len(valid_idx), ticker.encode()[:16].ljust(16, b'\x00'), dtype="S16")
+            )
+            _rows_list.append(valid_idx)
+
+        if _tickers_list:
+            self._tickers_arr = np.concatenate(_tickers_list)   # shape (N,), dtype S16
+            self._rows_arr    = np.concatenate(_rows_list)       # shape (N,), dtype int32
+        else:
+            self._tickers_arr = np.empty(0, dtype="S16")
+            self._rows_arr    = np.empty(0, dtype=np.int32)
+
+        # Do NOT assign self.index — we override __len__ and __getitem__ directly
+
+    def __len__(self):
+        return len(self._rows_arr)
+
+    def __getitem__(self, idx: int):
+        ticker = self._tickers_arr[idx].rstrip(b'\x00').decode()
+        row    = int(self._rows_arr[idx])
+
+        feat = np.load(self.cache / f"{ticker}_features.npy", mmap_mode="r")
+        tgt  = np.load(self.cache / f"{ticker}_targets.npy",  mmap_mode="r")
+
+        seq    = feat[row - self.cfg.minute_seq_len : row].copy()
+        target = float(tgt[row - 1])
+
+        date_path = self.cache / f"{ticker}_dates.npy"
+        if date_path.exists():
+            dates = np.load(date_path, mmap_mode="r")
+            date_idx = min(row, len(dates) - 1)
+            ordinal_date = int(dates[date_idx])
+        else:
+            ordinal_date = 0
+
+        return (
+            torch.from_numpy(seq),
+            torch.tensor(target, dtype=torch.float32),
+            torch.tensor(target, dtype=torch.float32),  # raw_y (minute targets are already raw)
+            ordinal_date,
+            ticker,
+        )
 
     def _temporal_bounds(self, warmup, n_rows, cfg):
         return warmup, n_rows
