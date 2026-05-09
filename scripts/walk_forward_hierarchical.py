@@ -132,17 +132,23 @@ class WindowMinuteDataset(LazyMinuteDataset):
             if not feat_path.exists() or not tgt_path.exists() or not date_path.exists():
                 continue
 
-            feat = np.load(feat_path, mmap_mode="r")
-            tgt = np.load(tgt_path, mmap_mode="r")
             dates = np.load(date_path, mmap_mode="r")
+            tgt = np.load(tgt_path, mmap_mode="r")
+            feat = np.load(feat_path, mmap_mode="r")
             n_rows, n_feat = feat.shape
             self.n_features = n_feat
 
-            for i in range(cfg.minute_seq_len, n_rows, cfg.minute_stride):
-                if not np.isnan(tgt[i - 1]):
-                    d = int(dates[i - 1])
-                    if date_lo <= d < date_hi:
-                        self.index.append((ticker, i))
+            # Vectorised index build — avoids Python-level row-by-row loop
+            idx = np.arange(cfg.minute_seq_len, n_rows, cfg.minute_stride)
+            if len(idx) == 0:
+                continue
+            prev_idx = idx - 1
+            valid = (
+                ~np.isnan(tgt[prev_idx]) &
+                (dates[prev_idx] >= date_lo) &
+                (dates[prev_idx] < date_hi)
+            )
+            self.index.extend((ticker, int(i)) for i in idx[valid])
 
     def _temporal_bounds(self, warmup, n_rows, cfg):
         return warmup, n_rows
