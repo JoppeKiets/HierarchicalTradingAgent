@@ -256,7 +256,8 @@ def get_minute_date_range(
 ) -> Optional[Tuple[int, int]]:
     """Return (min_ordinal, max_ordinal) of all cached minute data, or None."""
     cache = Path(cfg.cache_dir) / "minute"
-    all_dates = []
+    global_min: Optional[int] = None
+    global_max: Optional[int] = None
     for ticker in tickers:
         date_path = cache / f"{ticker}_dates.npy"
         if not date_path.exists():
@@ -264,10 +265,14 @@ def get_minute_date_range(
         dates = np.load(date_path, mmap_mode="r")
         nonzero = dates[dates > 0]
         if len(nonzero):
-            all_dates.extend(nonzero.tolist())
-    if not all_dates:
+            lo, hi = int(nonzero.min()), int(nonzero.max())
+            if global_min is None or lo < global_min:
+                global_min = lo
+            if global_max is None or hi > global_max:
+                global_max = hi
+    if global_min is None or global_max is None:
         return None
-    return int(min(all_dates)), int(max(all_dates))
+    return global_min, global_max
 
 
 def make_minute_loaders(
