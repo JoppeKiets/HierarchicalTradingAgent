@@ -132,6 +132,7 @@ class WindowMinuteDataset(LazyMinuteDataset):
         # Compact storage: parallel arrays instead of list-of-tuples
         _tickers_list: List[np.ndarray] = []
         _rows_list: List[np.ndarray] = []
+        _canonical_n_feat: Optional[int] = None  # set from first valid ticker
 
         for ticker in tickers:
             feat_path = self.cache / f"{ticker}_features.npy"
@@ -144,6 +145,12 @@ class WindowMinuteDataset(LazyMinuteDataset):
             tgt   = np.load(tgt_path,  mmap_mode="r")
             feat  = np.load(feat_path, mmap_mode="r")
             n_rows, n_feat = feat.shape
+
+            # Enforce consistent feature width — skip tickers that differ
+            if _canonical_n_feat is None:
+                _canonical_n_feat = n_feat
+            elif n_feat != _canonical_n_feat:
+                continue
             self.n_features = n_feat
 
             # Vectorised index build
